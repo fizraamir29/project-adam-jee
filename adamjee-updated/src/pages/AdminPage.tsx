@@ -229,11 +229,17 @@ export default function AdminPage() {
         fetch('/api/admin/users', { headers })
       ]);
 
-      if (statsRes.ok) setStats((await statsRes.json()).stats);
-      if (prodRes.ok) setProducts((await prodRes.json()).data);
-      if (ordRes.ok) setOrders((await ordRes.json()).orders);
-      if (msgRes.ok) setMessages((await msgRes.json()).data);
-      if (usersRes.ok) setUsers((await usersRes.json()).users);
+      const statsData = statsRes.ok ? await statsRes.json() : {};
+      const prodData = prodRes.ok ? await prodRes.json() : {};
+      const ordData = ordRes.ok ? await ordRes.json() : {};
+      const msgData = msgRes.ok ? await msgRes.json() : {};
+      const usersData = usersRes.ok ? await usersRes.json() : {};
+
+      setStats(statsData.stats || null);
+      setProducts(prodData.products || prodData.data || []);
+      setOrders(ordData.orders || ordData.data || []);
+      setMessages(msgData.messages || msgData.data || []);
+      setUsers(usersData.users || usersData.data || []);
 
     } catch (err) {
       console.error('Failed to load admin data:', err);
