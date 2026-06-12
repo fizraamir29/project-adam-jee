@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSEO } from '../hooks/useSEO';
 import {
   LayoutDashboard, ShoppingBag, Package, Users, MessageSquare,
   BarChart3, Settings, Plus, Pencil, Trash2, Search, Eye,
@@ -188,6 +189,11 @@ const NAV_ITEMS = [
 ];
 
 export default function AdminPage() {
+  useSEO({
+    title: "Admin Control Panel | Adamjee Computers",
+    description: "Secure administrative dashboard for managing products, categories, customer orders, contacts, and users at Adamjee Computers Pakistan.",
+    keywords: "admin control, admin panel, dashboard, product management, order management"
+  });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');

@@ -50,33 +50,24 @@ export default function AIChatbot() {
     setIsTyping(true);
 
     try {
-      // Map conversation history to OpenRouter structure (excluding welcome message ID '0')
-      const conversationHistory = updatedMessages
-        .filter(msg => msg.id !== '0')
-        .map(msg => ({
-          role: msg.role === 'bot' ? 'assistant' : 'user',
-          content: msg.text
-        }));
+      const token = localStorage.getItem('token');
+      const sessionId = localStorage.getItem('chat_session_id') || undefined;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
       const response = await fetch(
-        "https://openrouter.ai/api/v1/chat/completions",
+        "/api/chatbot/message",
         {
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://adamjeecomputers.com",
-            "X-Title": "Adamjee Computers"
-          },
+          headers,
           body: JSON.stringify({
-            model: "google/gemma-2-9b-it:free",
-            messages: [
-              {
-                role: "system",
-                content: "You are a helpful gaming PC expert assistant for Adamjee Computers Pakistan. Help customers with product recommendations, PC builds, gaming setup advice, and general tech questions. Be friendly and concise."
-              },
-              ...conversationHistory
-            ]
+            message: text,
+            sessionId
           })
         }
       );
@@ -86,7 +77,10 @@ export default function AIChatbot() {
       }
 
       const data = await response.json();
-      const reply = data.choices?.[0]?.message?.content || "I couldn't process that response. Please try again.";
+      if (data.sessionId) {
+        localStorage.setItem('chat_session_id', data.sessionId);
+      }
+      const reply = data.message || "I couldn't process that response. Please try again.";
 
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),

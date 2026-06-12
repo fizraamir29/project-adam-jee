@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useSEO } from "../hooks/useSEO";
 import { Product } from "../types";
 import { BUNDLE_PRODUCTS } from "../data";
 import HeroSection from "../components/HeroSection";
@@ -21,6 +22,11 @@ interface HomePageProps {
 }
 
 export default function HomePage({ handleAddToCart, formatPrice }: HomePageProps) {
+  useSEO({
+    title: "Adamjee Computers | Premium Custom Gaming PCs & Laptops Pakistan",
+    description: "Buy premium custom gaming PCs, high-performance laptops, graphic cards, and tech components at Adamjee Computers Pakistan. Custom build your dream gaming rig today.",
+    keywords: "gaming PC, custom rig, laptops, computer accessories, tech store, Adamjee Computers, DHA Karachi, Pakistan"
+  });
   // Bundle Builder
   const [bundle, setBundle] = useState<Product[]>(() => [BUNDLE_PRODUCTS[0], BUNDLE_PRODUCTS[3]]);
   const [showBundleMessage, setShowBundleMessage] = useState(false);

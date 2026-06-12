@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useSEO } from '../hooks/useSEO';
 import { UserPlus, ArrowRight } from 'lucide-react';
 
 export default function RegisterPage() {
+  useSEO({
+    title: "Create Account | Join Adamjee Computers",
+    description: "Register a new customer account at Adamjee Computers Pakistan to place orders, save PC builds, receive member-exclusive discount alerts, and check order statuses.",
+    keywords: "register account, signup tech store, member portal, Adamjee Computers"
+  });
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();

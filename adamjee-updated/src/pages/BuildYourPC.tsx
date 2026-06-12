@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useSEO } from "../hooks/useSEO";
 import { 
   PROCESSORS, GPUS, MOTHERBOARDS, MEMORIES, STORAGES, PSUS, COOLS, CASES, 
   ADD_ON_COMPONENTS, BUNDLE_PRODUCTS 
@@ -13,6 +14,11 @@ interface BuildYourPCProps {
 }
 
 export default function BuildYourPC({ handleAddToCart, formatPrice }: BuildYourPCProps) {
+  useSEO({
+    title: "Custom PC Builder | Build Your Gaming Rig | Adamjee Computers",
+    description: "Design and build your custom gaming PC with our interactive PC builder. Choose your CPU, GPU, motherboard, RAM, storage, power supply, and case with real-time price estimation.",
+    keywords: "custom PC builder, gaming PC builder, build a PC, gaming rig, custom desktop, Adamjee Computers, Karachi"
+  });
   const navigate = useNavigate();
 
   // State for selected components

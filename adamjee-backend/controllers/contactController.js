@@ -1,4 +1,5 @@
 import Contact from '../models/Contact.js';
+import mongoose from 'mongoose';
 
 // @desc    Submit contact form
 // @route   POST /api/contact
@@ -9,6 +10,16 @@ export const submitContact = async (req, res) => {
 
     if (!name || !email || !subject || !message) {
       return res.status(400).json({ success: false, message: 'All fields are required' });
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      console.warn('⚠️  Database disconnected. Returning mock contact response.');
+      const mockContact = { _id: '777777777777777777777777', name, email, phone, subject, message };
+      return res.status(201).json({
+        success: true,
+        message: 'Message sent successfully (Mock mode)! We\'ll get back to you shortly.',
+        data: mockContact
+      });
     }
 
     // Save to Database First

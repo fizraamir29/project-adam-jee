@@ -1,9 +1,15 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useSEO } from '../hooks/useSEO';
 import { Loader2, ArrowRight, ShieldAlert, TrendingUp, Cpu, Compass, ChevronRight } from 'lucide-react';
 import { PROCESSORS, GPUS, MEMORIES, TARGET_GAMES } from '../data';
 
 export default function BenchmarksPage() {
+  useSEO({
+    title: "PC Performance Checker & Gaming Benchmarks | Adamjee Computers",
+    description: "Verify your custom gaming PC's estimated frame rates (FPS) for popular games like Cyberpunk 2077, FiveM, GTA V, CS2, and Valorant using our hardware matcher.",
+    keywords: "gaming benchmarks, PC builder, FPS calculator, PC specs matcher, bottleneck checker, gaming PC Pakistan"
+  });
   // Config state
   const [cpu, setCpu] = useState(PROCESSORS[0].name);
   const [gpu, setGpu] = useState(GPUS[0].name);

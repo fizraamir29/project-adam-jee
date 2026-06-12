@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Send, Facebook, Instagram, Youtube } from 'lucide-react';
+import { useSEO } from '../hooks/useSEO';
 import { saveMessage } from "../utils/storage";
 
 export default function ContactPage() {
+  useSEO({
+    title: "Contact Us | Tech Experts & Gaming Support | Adamjee Computers",
+    description: "Get in touch with the hardware experts at Adamjee Computers Pakistan. Ask questions about custom setups, pricing, custom gaming rigs, or component upgrades.",
+    keywords: "contact computer shop, custom rig builders, PC customer support, tech help Karachi, Adamjee Computers"
+  });
   const [formData, setFormData] = useState({
     name: '',
     email: '',

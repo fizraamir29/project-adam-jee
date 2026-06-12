@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import mongoose from 'mongoose';
 import ChatSession from '../models/ChatSession.js';
 import Product from '../models/Product.js';
 import Order from '../models/Order.js';
@@ -14,15 +15,39 @@ const uuidv4 = () => {
 let openaiClient;
 const getOpenAI = () => {
   if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const apiKey = process.env.OPENAI_API_KEY;
+    const isOpenRouter = apiKey && apiKey.startsWith('sk-or-');
+    openaiClient = new OpenAI({
+      apiKey,
+      ...(isOpenRouter && { baseURL: 'https://openrouter.ai/api/v1' }),
+      defaultHeaders: {
+        'HTTP-Referer': 'https://adamjeecomputers.com',
+        'X-Title': 'Adamjee Computers',
+      }
+    });
   }
   return openaiClient;
 };
 
 // Build system prompt with live product & policy context
 const buildSystemPrompt = async () => {
-  const products = await Product.find({ isPublished: true }).select('name price category stock tag').limit(20);
-  const productList = products.map(p => `- ${p.name} | $${p.price} | ${p.category} | ${p.stock > 0 ? 'In Stock' : 'Out of Stock'}`).join('\n');
+  let productList = '';
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const products = await Product.find({ isPublished: true }).select('name price category stock tag').limit(20);
+      productList = products.map(p => `- ${p.name} | $${p.price} | ${p.category} | ${p.stock > 0 ? 'In Stock' : 'Out of Stock'}`).join('\n');
+    } catch (err) {
+      console.error('Error fetching live products:', err.message);
+    }
+  }
+
+  if (!productList) {
+    productList = `- Gaming PC Extreme | $1500 | Desktops | In Stock
+- Ryzen 5 Pro Setup | $800 | Desktops | In Stock
+- Razer DeathAdder Mouse | $60 | Peripherals | In Stock
+- Corsair Mechanical Keyboard | $120 | Peripherals | In Stock
+- ASUS ROG Swift Monitor | $450 | Monitors | In Stock`;
+  }
 
   return `You are AdamBot, the AI-powered customer support assistant for Adamjee Computers — a premium tech and gaming hardware store in Pakistan.
 
@@ -60,6 +85,29 @@ export const sendMessage = async (req, res) => {
 
     const sessionId = providedSessionId || uuidv4();
 
+    if (mongoose.connection.readyState !== 1) {
+      console.warn('⚠️  Database disconnected. Returning mock chatbot completion.');
+      const systemPrompt = await buildSystemPrompt();
+      const recentMessages = [{ role: 'user', content: message }];
+      
+      const apiKey = process.env.OPENAI_API_KEY;
+      const isOpenRouter = apiKey && apiKey.startsWith('sk-or-');
+      const modelToUse = isOpenRouter ? 'openrouter/free' : 'gpt-4o-mini';
+
+      const completion = await getOpenAI().chat.completions.create({
+        model: modelToUse,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...recentMessages,
+        ],
+        max_tokens: 300,
+        temperature: 0.7,
+      });
+
+      const botReply = completion.choices[0].message.content;
+      return res.json({ success: true, message: botReply, sessionId, escalated: false });
+    }
+
     // Find or create session
     let session = await ChatSession.findOne({ sessionId });
     if (!session) {
@@ -92,8 +140,12 @@ export const sendMessage = async (req, res) => {
       content: m.content,
     }));
 
+    const apiKey = process.env.OPENAI_API_KEY;
+    const isOpenRouter = apiKey && apiKey.startsWith('sk-or-');
+    const modelToUse = isOpenRouter ? 'openrouter/free' : 'gpt-4o-mini';
+
     const completion = await getOpenAI().chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: modelToUse,
       messages: [
         { role: 'system', content: systemPrompt },
         ...recentMessages,

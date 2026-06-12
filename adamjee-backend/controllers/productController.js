@@ -1,4 +1,5 @@
 import Product from '../models/Product.js';
+import mongoose from 'mongoose';
 
 // @desc    Get all products (with filtering, sorting, pagination)
 // @route   GET /api/products
@@ -9,6 +10,41 @@ export const getProducts = async (req, res) => {
       keyword, category, minPrice, maxPrice,
       tag, sort, page = 1, limit = 12, featured
     } = req.query;
+
+    if (mongoose.connection.readyState !== 1) {
+      console.warn('⚠️  Database disconnected. Returning mock product list.');
+      const mockProducts = [
+        {
+          _id: '111111111111111111111111',
+          id: '111111111111111111111111',
+          name: 'Gaming PC Extreme',
+          code: 'GPC-EXT',
+          price: 1500,
+          rating: 4.8,
+          image: '/images/custom_blue_gaming_pc_cases_1780242165601.png',
+          category: 'Desktops',
+          tag: 'Hot',
+          description: 'Premium custom built gaming PC.'
+        },
+        {
+          _id: '222222222222222222222222',
+          id: '222222222222222222222222',
+          name: 'ASUS ROG Laptop',
+          code: 'LAP-ROG',
+          price: 1800,
+          rating: 4.9,
+          image: '/images/gaming_laptops_1780242133405.png',
+          category: 'Laptops',
+          tag: 'New',
+          description: 'ASUS ROG Strix Gaming Laptop.'
+        }
+      ];
+      return res.json({
+        success: true,
+        products: mockProducts,
+        pagination: { total: mockProducts.length, page: 1, pages: 1, limit: 12 }
+      });
+    }
 
     const query = { isPublished: true };
 

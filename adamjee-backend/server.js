@@ -76,14 +76,16 @@ const seedAdmin = async () => {
 };
 
 // ─── Database Connection ──────────────────────────────────────
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, {
+  serverSelectionTimeoutMS: 5000,
+})
   .then(async () => {
     console.log('✅ MongoDB Connected');
     await seedAdmin();
   })
   .catch(err => {
     console.error('❌ MongoDB Connection Error:', err.message);
-    process.exit(1);
+    console.warn('⚠️  Warning: Mongoose connection failed. Running server in local fallback mode.');
   });
 
 // ─── API Routes ───────────────────────────────────────────────

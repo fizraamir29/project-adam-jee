@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useSEO } from '../hooks/useSEO';
 import { ShoppingBag, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
+  useSEO({
+    title: "Sign In | Customer Portal | Adamjee Computers",
+    description: "Login to your Adamjee Computers customer portal to check your order status, manage wishlist items, track warranty support, and update saved addresses.",
+    keywords: "sign in, customer login, order status, track PC build, Adamjee Computers"
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
