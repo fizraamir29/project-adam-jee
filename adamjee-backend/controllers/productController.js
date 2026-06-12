@@ -1,6 +1,40 @@
 import Product from '../models/Product.js';
 import mongoose from 'mongoose';
 
+// In-Memory mock products storage for disconnected MERN stack simulation
+let mockProductsMemory = [
+  {
+    _id: '111111111111111111111111',
+    id: '111111111111111111111111',
+    name: 'Gaming PC Extreme',
+    code: 'GPC-EXT',
+    price: 1500,
+    rating: 4.8,
+    image: '/images/custom_blue_gaming_pc_cases_1780242165601.png',
+    category: 'Desktops',
+    tag: 'Hot',
+    description: 'Premium custom built gaming PC.',
+    isPublished: true,
+    isFeatured: true,
+    slug: 'gaming-pc-extreme'
+  },
+  {
+    _id: '222222222222222222222222',
+    id: '222222222222222222222222',
+    name: 'ASUS ROG Laptop',
+    code: 'LAP-ROG',
+    price: 1800,
+    rating: 4.9,
+    image: '/images/gaming_laptops_1780242133405.png',
+    category: 'Laptops',
+    tag: 'New',
+    description: 'ASUS ROG Strix Gaming Laptop.',
+    isPublished: true,
+    isFeatured: true,
+    slug: 'asus-rog-laptop'
+  }
+];
+
 // @desc    Get all products (with filtering, sorting, pagination)
 // @route   GET /api/products
 // @access  Public
@@ -13,36 +47,20 @@ export const getProducts = async (req, res) => {
 
     if (mongoose.connection.readyState !== 1) {
       console.warn('⚠️  Database disconnected. Returning mock product list.');
-      const mockProducts = [
-        {
-          _id: '111111111111111111111111',
-          id: '111111111111111111111111',
-          name: 'Gaming PC Extreme',
-          code: 'GPC-EXT',
-          price: 1500,
-          rating: 4.8,
-          image: '/images/custom_blue_gaming_pc_cases_1780242165601.png',
-          category: 'Desktops',
-          tag: 'Hot',
-          description: 'Premium custom built gaming PC.'
-        },
-        {
-          _id: '222222222222222222222222',
-          id: '222222222222222222222222',
-          name: 'ASUS ROG Laptop',
-          code: 'LAP-ROG',
-          price: 1800,
-          rating: 4.9,
-          image: '/images/gaming_laptops_1780242133405.png',
-          category: 'Laptops',
-          tag: 'New',
-          description: 'ASUS ROG Strix Gaming Laptop.'
-        }
-      ];
+      let filtered = [...mockProductsMemory];
+      if (category) {
+        filtered = filtered.filter(p => p.category.toLowerCase() === category.toLowerCase());
+      }
+      if (keyword) {
+        filtered = filtered.filter(p => p.name.toLowerCase().includes(keyword.toLowerCase()));
+      }
+      if (tag) {
+        filtered = filtered.filter(p => p.tag?.toLowerCase() === tag.toLowerCase());
+      }
       return res.json({
         success: true,
-        products: mockProducts,
-        pagination: { total: mockProducts.length, page: 1, pages: 1, limit: 12 }
+        products: filtered,
+        pagination: { total: filtered.length, page: 1, pages: 1, limit: 12 }
       });
     }
 
@@ -89,6 +107,13 @@ export const getProducts = async (req, res) => {
 export const getProduct = async (req, res) => {
   try {
     const { identifier } = req.params;
+    if (mongoose.connection.readyState !== 1) {
+      console.warn('⚠️  Database disconnected. Returning mock single product details.');
+      const product = mockProductsMemory.find(p => p._id === identifier || p.slug === identifier);
+      if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+      return res.json({ success: true, product });
+    }
+
     const product = await Product.findOne({
       $or: [{ slug: identifier }, { _id: identifier.match(/^[0-9a-fA-F]{24}$/) ? identifier : null }],
     });
@@ -129,14 +154,18 @@ export const createProduct = async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
       console.warn('⚠️  Database disconnected. Mocking product creation.');
+      const newId = new mongoose.Types.ObjectId().toString();
+      const slug = req.body.name ? req.body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : 'product-slug';
       const mockProduct = {
-        _id: new mongoose.Types.ObjectId().toString(),
-        id: new mongoose.Types.ObjectId().toString(),
+        _id: newId,
+        id: newId,
+        slug,
         ...req.body,
         rating: 5,
         reviews: [],
         createdAt: new Date().toISOString()
       };
+      mockProductsMemory.push(mockProduct);
       return res.status(201).json({ success: true, product: mockProduct });
     }
     const product = await Product.create(req.body);
@@ -153,12 +182,16 @@ export const updateProduct = async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
       console.warn('⚠️  Database disconnected. Mocking product update.');
+      const index = mockProductsMemory.findIndex(p => p._id === req.params.id);
+      if (index === -1) return res.status(404).json({ success: false, message: 'Product not found' });
+      const slug = req.body.name ? req.body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : mockProductsMemory[index].slug;
       const mockProduct = {
-        _id: req.params.id,
-        id: req.params.id,
+        ...mockProductsMemory[index],
         ...req.body,
+        slug,
         updatedAt: new Date().toISOString()
       };
+      mockProductsMemory[index] = mockProduct;
       return res.json({ success: true, product: mockProduct });
     }
     const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
@@ -176,6 +209,9 @@ export const deleteProduct = async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
       console.warn('⚠️  Database disconnected. Mocking product deletion.');
+      const index = mockProductsMemory.findIndex(p => p._id === req.params.id);
+      if (index === -1) return res.status(404).json({ success: false, message: 'Product not found' });
+      mockProductsMemory.splice(index, 1);
       return res.json({ success: true, message: 'Product deleted successfully (Mock mode)' });
     }
     const product = await Product.findByIdAndDelete(req.params.id);
