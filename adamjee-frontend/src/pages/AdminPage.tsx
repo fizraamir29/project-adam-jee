@@ -7,6 +7,7 @@ import {
   Star, CheckCircle, Clock, Truck, AlertCircle
 } from 'lucide-react';
 import { Product } from '../types';
+import { saveProducts } from '../utils/storage';
 
 const statusColors: Record<string,string> = {
   delivered:  'bg-[#164475]/10 text-[#164475]',
@@ -247,6 +248,9 @@ export default function AdminPage() {
       setMessages(msgData.messages || msgData.data || []);
       setUsers(usersData.users || usersData.data || []);
 
+      if (prodRes.ok) {
+        saveProducts(prodData.products || prodData.data || []);
+      }
     } catch (err) {
       console.error('Failed to load admin data:', err);
     }

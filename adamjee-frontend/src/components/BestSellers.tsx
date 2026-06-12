@@ -1,7 +1,7 @@
 import React from "react";
 import { Star } from "lucide-react";
 import { Product } from "../types";
-import { BUNDLE_PRODUCTS } from "../data";
+import { getProducts } from "../utils/storage";
 
 interface BestSellersProps {
   bundle: Product[];
@@ -22,6 +22,9 @@ export default function BestSellers({
   const handleApplyBundleDiscount = (subtotal: number) => {
     return bundle.length >= 3 ? subtotal * 0.7 : subtotal;
   };
+
+  const allProducts = getProducts();
+  const bundleProducts = allProducts.filter(p => p.category === 'Accessories' || p.tag === 'Best Seller' || p.id?.startsWith('bp')).slice(0, 4);
 
   const bundleTotal = bundle.reduce((a, b) => a + b.price, 0);
   const discountedTotal = handleApplyBundleDiscount(bundleTotal);
@@ -54,7 +57,7 @@ export default function BestSellers({
           {/* Left Column product grid — scrollable */}
           <div className="lg:col-span-2 reveal-left">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {BUNDLE_PRODUCTS.map(prod => {
+          {bundleProducts.map(prod => {
               const inBundle = bundle.find(b => b.id === prod.id);
               return (
                 <div key={prod.id} className="bg-[#f8f9fa] rounded-[20px] flex flex-col justify-between p-4 card-hover">

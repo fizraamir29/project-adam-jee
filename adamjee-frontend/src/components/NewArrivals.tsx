@@ -1,7 +1,7 @@
 import React from "react";
 import { Star, ArrowRight, Eye } from "lucide-react";
 import { Product } from "../types";
-import { NEW_ARRIVALS } from "../data";
+import { getProducts } from "../utils/storage";
 
 interface NewArrivalsProps {
   onAddToCart: (product: Product) => void;
@@ -9,7 +9,8 @@ interface NewArrivalsProps {
 }
 
 export default function NewArrivals({ onAddToCart, formatPrice }: NewArrivalsProps) {
-  const products = NEW_ARRIVALS.slice(0, 6);
+  const allProducts = getProducts();
+  const products = allProducts.filter(p => p.tag === 'New' || p.tag === 'Hot' || p.tag === 'Sale').slice(0, 6);
 
   return (
     <section id="featured-arrivals" className="px-4 md:px-12 py-12 bg-gray-50/50">
