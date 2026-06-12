@@ -1,4 +1,5 @@
 import Order from '../models/Order.js';
+import mongoose from 'mongoose';
 
 // @desc    Create new order
 // @route   POST /api/orders

@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import Product from '../models/Product.js';
 import Order from '../models/Order.js';
 import ChatSession from '../models/ChatSession.js';
+import mongoose from 'mongoose';
 
 // @desc    Get full admin dashboard stats
 // @route   GET /api/admin/stats
