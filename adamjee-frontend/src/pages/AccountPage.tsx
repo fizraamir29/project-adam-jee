@@ -56,7 +56,7 @@ export default function AccountPage({ handleAddToCart, formatPrice }: AccountPag
 
         if (!userRes.ok) throw new Error('Failed to fetch user');
         const userData = await userRes.json();
-        setUser(userData.data);
+        setUser(userData.user || userData.data);
 
         if (ordersRes.ok) {
           const ordersData = await ordersRes.json();

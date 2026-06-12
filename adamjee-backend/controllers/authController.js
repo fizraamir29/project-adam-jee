@@ -217,3 +217,85 @@ export const changePassword = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// @desc    Google Sign-In / Sign-Up
+// @route   POST /api/auth/google
+// @access  Public
+export const googleLogin = async (req, res) => {
+  try {
+    const { email, name, googleId } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Google email is required' });
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      console.warn('⚠️  Database disconnected. Handling mock Google Login.');
+      let user = mockUsersMemory.find(u => u.email === email);
+      
+      if (!user) {
+        // Automatically sign up user in memory
+        const mockId = new mongoose.Types.ObjectId().toString();
+        user = {
+          _id: mockId,
+          name: name || email.split('@')[0],
+          email,
+          role: 'customer',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        };
+        mockUsersMemory.push(user);
+        console.log(`✅ Google User automatically registered in mock memory: ${email}`);
+      }
+
+      if (!user.isActive) {
+        return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact support.' });
+      }
+
+      const token = generateToken(user._id, email);
+      return res.json({
+        success: true,
+        message: 'Google login successful (Mock mode)!',
+        token,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        user: { id: user._id, name: user.name, email: user.email, role: user.role }
+      });
+    }
+
+    // Connected Mode
+    let user = await User.findOne({ email });
+    if (!user) {
+      // Create user automatically on Google sign-up
+      user = await User.create({
+        name: name || email.split('@')[0],
+        email,
+        password: new mongoose.Types.ObjectId().toString(), // dummy password for OAuth users
+        role: 'customer',
+        isActive: true
+      });
+      console.log(`✅ Google User automatically registered in MongoDB: ${email}`);
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact support.' });
+    }
+
+    const token = generateToken(user._id, user.email);
+    res.json({
+      success: true,
+      message: 'Google login successful!',
+      token,
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

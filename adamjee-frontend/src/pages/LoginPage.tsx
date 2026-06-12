@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSEO } from '../hooks/useSEO';
 import { ShoppingBag, ArrowRight } from 'lucide-react';
+import GoogleLoginModal from '../components/GoogleLoginModal';
 
 export default function LoginPage() {
   useSEO({
@@ -12,9 +13,22 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const [error, setError] = useState('');
+
+  const handleGoogleSuccess = (userData: any) => {
+    setIsGoogleModalOpen(false);
+    localStorage.setItem('token', userData.token);
+    localStorage.setItem('user', JSON.stringify({
+      _id: userData._id,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role
+    }));
+    navigate('/account');
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +127,28 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-[#e2e8f0] text-center">
+        <div className="relative my-6 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-[#e2e8f0]"></div>
+          </div>
+          <span className="relative px-3 bg-white text-xs font-bold text-[#64748b] uppercase tracking-wider">or</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsGoogleModalOpen(true)}
+          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-700 font-extrabold py-3.5 px-4 rounded-xl border border-gray-200 shadow-sm transition-all duration-300 hover:-translate-y-0.5"
+        >
+          <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.92h6.69c-.29 1.5-1.14 2.77-2.4 3.61v3h3.86c2.26-2.09 3.59-5.17 3.59-8.46z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.97-1.08 7.96-2.91l-3.86-3c-1.08.72-2.45 1.16-4.1 1.16-3.15 0-5.81-2.13-6.76-5.01H1.32v3.1C3.3 22.28 7.37 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.24 14.24a8.4 8.4 0 0 1 0-2.48V8.66H1.32a11.96 11.96 0 0 0 0 6.68l3.92-3.1z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.96 1.19 15.24 0 12 0 7.37 0 3.3 1.72 1.32 4.75l3.92 3.1c.95-2.88 3.61-5.1 6.76-5.1z"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        <div className="mt-6 pt-6 border-t border-[#e2e8f0] text-center">
           <p className="text-[#64748b] text-sm font-medium">
             Don't have an account?{' '}
             <Link to="/register" className="text-[#164475] font-extrabold hover:text-[#0a1b2d] transition-colors">
@@ -122,6 +157,12 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      <GoogleLoginModal 
+        isOpen={isGoogleModalOpen} 
+        onClose={() => setIsGoogleModalOpen(false)} 
+        onSuccess={handleGoogleSuccess} 
+      />
     </div>
   );
 }
