@@ -9,6 +9,28 @@ const generateToken = (userId, email) => {
   });
 };
 
+// In-Memory mock users database
+let mockUsersMemory = [
+  {
+    _id: '555555555555555555555555',
+    name: 'Adamjee Admin',
+    email: 'admin@admin.gmail.com',
+    password: 'admin@admin.gmail.com',
+    role: 'admin',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    _id: '666666666666666666666666',
+    name: 'Test User',
+    email: 'testuser@gmail.com',
+    password: 'Password123!',
+    role: 'customer',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  }
+];
+
 // @desc    Register new user
 // @route   POST /api/auth/register
 // @access  Public
@@ -17,8 +39,22 @@ export const register = async (req, res) => {
     const { name, email, password } = req.body;
 
     if (mongoose.connection.readyState !== 1) {
-      console.warn('⚠️  Database disconnected. Returning mock register response.');
-      const mockId = '666666666666666666666666';
+      console.warn('⚠️  Database disconnected. Registering mock user.');
+      const existing = mockUsersMemory.find(u => u.email === email);
+      if (existing) {
+        return res.status(400).json({ success: false, message: 'Email already registered. Please login instead.' });
+      }
+      const mockId = new mongoose.Types.ObjectId().toString();
+      const newUser = {
+        _id: mockId,
+        name,
+        email,
+        password, // plain text in mock mode
+        role: 'customer',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+      mockUsersMemory.push(newUser);
       const token = generateToken(mockId, email);
       return res.status(201).json({
         success: true,
@@ -63,19 +99,27 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     if (mongoose.connection.readyState !== 1) {
-      console.warn('⚠️  Database disconnected. Returning mock login response.');
-      const mockId = email === 'admin@admin.gmail.com' ? '555555555555555555555555' : '666666666666666666666666';
-      const mockRole = email === 'admin@admin.gmail.com' ? 'admin' : 'customer';
-      const token = generateToken(mockId, email);
+      console.warn('⚠️  Database disconnected. Mocking login check.');
+      const user = mockUsersMemory.find(u => u.email === email);
+      if (!user) {
+        return res.status(400).json({ success: false, message: 'Email not registered. Please sign up first.' });
+      }
+      if (user.password !== password) {
+        return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      }
+      if (!user.isActive) {
+        return res.status(403).json({ success: false, message: 'Your account has been deactivated. Please contact support.' });
+      }
+      const token = generateToken(user._id, email);
       return res.json({
         success: true,
         message: 'Login successful (Mock mode)!',
         token,
-        _id: mockId,
-        name: email === 'admin@admin.gmail.com' ? 'Adamjee Admin' : 'Test User',
-        email,
-        role: mockRole,
-        user: { id: mockId, name: email === 'admin@admin.gmail.com' ? 'Adamjee Admin' : 'Test User', email, role: mockRole },
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        user: { id: user._id, name: user.name, email: user.email, role: user.role },
       });
     }
 
@@ -115,14 +159,16 @@ export const login = async (req, res) => {
 export const getMe = async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
+      const user = mockUsersMemory.find(u => u._id === req.user.id);
+      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
       return res.json({
         success: true,
         user: {
-          id: req.user.id,
-          name: req.user.id === '555555555555555555555555' ? 'Adamjee Admin' : 'Test User',
-          email: req.user.email,
-          role: req.user.id === '555555555555555555555555' ? 'admin' : 'customer',
-          isActive: true
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          isActive: user.isActive
         }
       });
     }

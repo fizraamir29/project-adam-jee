@@ -1,6 +1,21 @@
 import Order from '../models/Order.js';
 import mongoose from 'mongoose';
 
+// In-Memory mock orders storage for disconnected MERN stack simulation
+let mockOrdersMemory = [
+  {
+    _id: '888888888888888888888888',
+    orderId: 'ORD-12345',
+    user: '666666666666666666666666', // linked to default mock customer Test User
+    total: 1500,
+    orderStatus: 'pending',
+    paymentMethod: 'cod',
+    createdAt: new Date().toISOString(),
+    items: [],
+    shippingAddress: { fullName: 'Test User', address: 'Mock St', city: 'Karachi', country: 'Pakistan' }
+  }
+];
+
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Public (supports guest checkout)
@@ -10,8 +25,9 @@ export const createOrder = async (req, res) => {
 
     if (mongoose.connection.readyState !== 1) {
       console.warn('⚠️  Database disconnected. Mocking order creation.');
+      const newId = new mongoose.Types.ObjectId().toString();
       const mockOrder = {
-        _id: '999999999999999999999999',
+        _id: newId,
         orderId: 'ORD-' + Math.floor(10000 + Math.random() * 90000),
         items,
         shippingAddress,
@@ -23,8 +39,11 @@ export const createOrder = async (req, res) => {
         notes,
         orderStatus: 'pending',
         paymentStatus: 'pending',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        user: req.user ? req.user.id : null,
+        guestEmail: req.user ? null : guestEmail
       };
+      mockOrdersMemory.unshift(mockOrder); // add to beginning
       return res.status(201).json({ success: true, message: 'Order placed successfully (Mock mode)!', order: mockOrder });
     }
 
@@ -61,17 +80,7 @@ export const getMyOrders = async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
       console.warn('⚠️  Database disconnected. Returning mock user orders.');
-      const mockOrders = [
-        {
-          _id: '888888888888888888888888',
-          orderId: 'ORD-12345',
-          total: 1500,
-          orderStatus: 'pending',
-          paymentMethod: 'cod',
-          createdAt: new Date().toISOString(),
-          items: []
-        }
-      ];
+      const mockOrders = mockOrdersMemory.filter(o => o.user === req.user.id);
       return res.json({ success: true, orders: mockOrders });
     }
 
@@ -91,19 +100,9 @@ export const getOrder = async (req, res) => {
   try {
     if (mongoose.connection.readyState !== 1) {
       console.warn('⚠️  Database disconnected. Returning mock order details.');
-      return res.json({
-        success: true,
-        order: {
-          _id: '888888888888888888888888',
-          orderId: req.params.orderId,
-          total: 1500,
-          orderStatus: 'pending',
-          paymentMethod: 'cod',
-          createdAt: new Date().toISOString(),
-          items: [],
-          shippingAddress: { address: 'Mock St', city: 'Karachi', country: 'Pakistan' }
-        }
-      });
+      const order = mockOrdersMemory.find(o => o.orderId === req.params.orderId);
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+      return res.json({ success: true, order });
     }
 
     const order = await Order.findOne({ orderId: req.params.orderId }).populate('items.product', 'name images slug');
@@ -129,27 +128,11 @@ export const getAllOrders = async (req, res) => {
 
     if (mongoose.connection.readyState !== 1) {
       console.warn('⚠️  Database disconnected. Returning mock orders list.');
-      const mockOrders = [
-        {
-          _id: '888888888888888888888888',
-          orderId: 'ORD-12345',
-          total: 1500,
-          orderStatus: 'pending',
-          paymentMethod: 'cod',
-          createdAt: new Date().toISOString(),
-          user: { name: 'Test User', email: 'testuser@gmail.com' }
-        },
-        {
-          _id: '999999999999999999999999',
-          orderId: 'ORD-67890',
-          total: 1800,
-          orderStatus: 'processing',
-          paymentMethod: 'card',
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          user: { name: 'Adamjee Admin', email: 'admin@admin.gmail.com' }
-        }
-      ];
-      return res.json({ success: true, orders: mockOrders, total: mockOrders.length });
+      let filtered = [...mockOrdersMemory];
+      if (status) {
+        filtered = filtered.filter(o => o.orderStatus === status.toLowerCase());
+      }
+      return res.json({ success: true, orders: filtered, total: filtered.length });
     }
 
     const query = status ? { orderStatus: status } : {};
@@ -173,10 +156,14 @@ export const updateOrderStatus = async (req, res) => {
 
     if (mongoose.connection.readyState !== 1) {
       console.warn('⚠️  Database disconnected. Mocking order status update.');
+      const index = mockOrdersMemory.findIndex(o => o.orderId === req.params.orderId);
+      if (index === -1) return res.status(404).json({ success: false, message: 'Order not found' });
+      mockOrdersMemory[index].orderStatus = orderStatus;
+      if (trackingNumber) mockOrdersMemory[index].trackingNumber = trackingNumber;
       return res.json({
         success: true,
         message: 'Order status updated! (Mock mode)',
-        order: { orderId: req.params.orderId, orderStatus, trackingNumber }
+        order: mockOrdersMemory[index]
       });
     }
 
