@@ -13,6 +13,8 @@ const invoiceSchema = new mongoose.Schema({
   customerName: { type: String, required: true },
   customerEmail: { type: String, default: '' },
   customerPhone: { type: String, default: '' },
+  customerAddress: { type: String, default: '' },
+  shippingCharges: { type: Number, default: 0 },
   items: [invoiceItemSchema],
   discountType: { type: String, enum: ['fixed', 'percentage'], default: 'fixed' },
   discountValue: { type: Number, default: 0 },

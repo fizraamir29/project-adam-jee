@@ -711,7 +711,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ route: 
         return NextResponse.json({ success: false, message: 'Access denied. Admins only.' }, { status: 403 });
       }
 
-      const { customerName, customerEmail, customerPhone, items, discountType, discountValue, discountAmount, taxRate, taxAmount, subtotal, total, paymentMethod, notes } = body;
+      const {
+        customerName, customerEmail, customerPhone, customerAddress, shippingCharges,
+        items, discountType, discountValue, discountAmount, taxRate, taxAmount, subtotal, total, paymentMethod, notes
+      } = body;
 
       if (!customerName || !items || items.length === 0) {
         return NextResponse.json({ success: false, message: 'Customer name and items are required' }, { status: 400 });
@@ -737,6 +740,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ route: 
           customerName,
           customerEmail: customerEmail || '',
           customerPhone: customerPhone || '',
+          customerAddress: customerAddress || '',
+          shippingCharges: Number(shippingCharges) || 0,
           items,
           discountType: discountType || 'fixed',
           discountValue: discountValue || 0,
@@ -765,7 +770,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ route: 
       }
 
       const invoice = await Invoice.create({
-        customerName, customerEmail, customerPhone, items, discountType, discountValue, discountAmount, taxRate, taxAmount, subtotal, total, paymentMethod, notes
+        customerName, customerEmail, customerPhone, customerAddress, shippingCharges: Number(shippingCharges) || 0,
+        items, discountType, discountValue, discountAmount, taxRate, taxAmount, subtotal, total, paymentMethod, notes
       });
 
       return NextResponse.json({ success: true, message: 'Invoice generated successfully!', invoice }, { status: 201 });

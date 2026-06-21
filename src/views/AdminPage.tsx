@@ -514,6 +514,7 @@ const NAV_ITEMS = [
   { id: 'reports',   icon: BarChart3,       label: 'Reports' },
   { id: 'messages',  icon: MessageSquare,   label: 'Contact Messages' },
   { id: 'users',     icon: Users,           label: 'Customers' },
+  { id: 'settings',  icon: Settings,        label: 'Settings' },
 ];
 
 /* ─── MAIN ADMIN PAGE ────────────────────────── */
@@ -564,6 +565,8 @@ export default function AdminPage() {
   const [invoiceCustomerName, setInvoiceCustomerName] = useState('');
   const [invoiceCustomerEmail, setInvoiceCustomerEmail] = useState('');
   const [invoiceCustomerPhone, setInvoiceCustomerPhone] = useState('');
+  const [invoiceCustomerAddress, setInvoiceCustomerAddress] = useState('');
+  const [invoiceShippingCharges, setInvoiceShippingCharges] = useState(0);
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [invoicePaymentMethod, setInvoicePaymentMethod] = useState('Cash');
   const [invoiceItems, setInvoiceItems] = useState<any[]>([{ productId: '', name: '', price: 0, cost: 0, quantity: 1 }]);
@@ -574,6 +577,65 @@ export default function AdminPage() {
 
   // Reports
   const [reportSubTab, setReportSubTab] = useState<'inventory' | 'physical' | 'online'>('inventory');
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+  const [reportCategory, setReportCategory] = useState('All');
+  const [reportStatus, setReportStatus] = useState('All');
+  const [reportStockStatus, setReportStockStatus] = useState('All');
+
+  // Store Settings
+  const [storeSettings, setStoreSettings] = useState({
+    storeName: 'Adamjee Computers',
+    storePhone: '+92 300 0000000',
+    storeEmail: 'support@adamjeecomputers.com',
+    storeAddress: 'Regal Plaza, Saddar, Karachi, Pakistan',
+    gstNumber: 'GST-1234567-8',
+    currency: '$',
+    defaultTaxRate: 18,
+    terms: '1. 1 Year warranty on premium products.\n2. 7-day window for hardware check/returns.\n3. No returns on burned, damaged, or modified parts.'
+  });
+
+  const filteredReportProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchCat = reportCategory === 'All' || p.category === reportCategory;
+      const matchSt = reportStatus === 'All' || (p.status || 'active') === reportStatus;
+      const invSt = getInventoryStatus(p.stock || 0, p.lowStockThreshold || 5);
+      const matchInv = reportStockStatus === 'All' || invSt === reportStockStatus;
+      
+      let matchDate = true;
+      if (reportStartDate || reportEndDate) {
+        const date = p.updatedAt ? new Date(p.updatedAt) : null;
+        if (reportStartDate && (!date || date < new Date(reportStartDate))) matchDate = false;
+        if (reportEndDate && (!date || date > new Date(new Date(reportEndDate).getTime() + 86400000))) matchDate = false;
+      }
+      return matchCat && matchSt && matchInv && matchDate;
+    });
+  }, [products, reportCategory, reportStatus, reportStockStatus, reportStartDate, reportEndDate]);
+
+  const filteredReportInvoices = useMemo(() => {
+    return invoices.filter(i => {
+      let matchDate = true;
+      if (reportStartDate || reportEndDate) {
+        const date = i.createdAt ? new Date(i.createdAt) : null;
+        if (reportStartDate && (!date || date < new Date(reportStartDate))) matchDate = false;
+        if (reportEndDate && (!date || date > new Date(new Date(reportEndDate).getTime() + 86400000))) matchDate = false;
+      }
+      return matchDate;
+    });
+  }, [invoices, reportStartDate, reportEndDate]);
+
+  const filteredReportOrders = useMemo(() => {
+    return orders.filter(o => {
+      let matchDate = true;
+      if (reportStartDate || reportEndDate) {
+        const date = o.createdAt ? new Date(o.createdAt) : null;
+        if (reportStartDate && (!date || date < new Date(reportStartDate))) matchDate = false;
+        if (reportEndDate && (!date || date > new Date(new Date(reportEndDate).getTime() + 86400000))) matchDate = false;
+      }
+      return matchDate;
+    });
+  }, [orders, reportStartDate, reportEndDate]);
+
 
   /* ─── DERIVED DATA ──────────────────────────── */
   const filteredProducts = useMemo(() => {
@@ -610,6 +672,8 @@ export default function AdminPage() {
 
   const productCategories = useMemo(() => ['All', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))], [products]);
 
+  const activeStoreSettings = showPrintInvoice?._storeSettings || storeSettings;
+
   // Pagination
   const { paged: pagedProducts, page: prodPage, setPage: setProdPage, totalPages: prodTotalPages } = usePagination(filteredProducts, 10);
   const { paged: pagedOrders, page: ordPage, setPage: setOrdPage, totalPages: ordTotalPages } = usePagination(filteredOrders, 10);
@@ -632,6 +696,14 @@ export default function AdminPage() {
       const log = JSON.parse(localStorage.getItem('inv_log') || '[]');
       setInventoryLog(log);
     } catch { setInventoryLog([]); }
+    // Load store settings
+    try {
+      const savedSettings = JSON.parse(localStorage.getItem('store_settings') || 'null');
+      if (savedSettings) {
+        setStoreSettings(savedSettings);
+        setInvoiceTaxRate(savedSettings.defaultTaxRate);
+      }
+    } catch { /* keep defaults */ }
   }, []);
 
   const loadData = async (token: string) => {
@@ -755,9 +827,11 @@ export default function AdminPage() {
     const discountAmount = invoiceDiscountType === 'fixed' ? invoiceDiscountValue : (subtotal * invoiceDiscountValue) / 100;
     const taxedAmount = subtotal - discountAmount;
     const taxAmount = (taxedAmount * invoiceTaxRate) / 100;
-    const total = taxedAmount + taxAmount;
+    const total = taxedAmount + taxAmount + invoiceShippingCharges;
     const invoiceData = {
       customerName: invoiceCustomerName, customerEmail: invoiceCustomerEmail, customerPhone: invoiceCustomerPhone,
+      customerAddress: invoiceCustomerAddress,
+      shippingCharges: Number(invoiceShippingCharges),
       items: invoiceItems.map(item => ({ productId: item.productId || '', name: item.name, price: Number(item.price), cost: Number(item.cost), quantity: Number(item.quantity) })),
       discountType: invoiceDiscountType, discountValue: Number(invoiceDiscountValue), discountAmount, taxRate: Number(invoiceTaxRate), taxAmount, subtotal, total,
       paymentMethod: invoicePaymentMethod, notes: invoiceNotes
@@ -767,12 +841,19 @@ export default function AdminPage() {
       const res = await fetch('/api/invoices', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(invoiceData) });
       const data = await res.json();
       if (res.ok) {
-        setInvoiceCustomerName(''); setInvoiceCustomerEmail(''); setInvoiceCustomerPhone(''); setInvoiceNotes('');
+        setInvoiceCustomerName(''); setInvoiceCustomerEmail(''); setInvoiceCustomerPhone('');
+        setInvoiceCustomerAddress(''); setInvoiceShippingCharges(0); setInvoiceNotes('');
         setInvoiceDiscountValue(0); setInvoiceItems([{ productId: '', name: '', price: 0, cost: 0, quantity: 1 }]);
         loadData(token!);
-        setShowPrintInvoice(data.invoice);
+        setShowPrintInvoice({ ...data.invoice, _storeSettings: storeSettings });
       } else { alert(data.message || 'Failed to save invoice'); }
     } catch { alert('Error saving invoice'); }
+  };
+
+  const handleSaveSettings = () => {
+    localStorage.setItem('store_settings', JSON.stringify(storeSettings));
+    setInvoiceTaxRate(storeSettings.defaultTaxRate);
+    alert('Settings saved successfully!');
   };
 
   const handleUpdateOrderStatus = async (orderId: string, status: string) => {
@@ -1329,6 +1410,12 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">Billing / Delivery Address</label>
+                  <textarea value={invoiceCustomerAddress} onChange={e => setInvoiceCustomerAddress(e.target.value)}
+                    rows={2} className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none resize-none"
+                    placeholder="House #12, Street 4, Block B, Gulshan-e-Iqbal, Karachi" />
+                </div>
               </div>
 
               <div className="bg-white rounded-2xl border border-[#e2e8f0] shadow-sm p-6 space-y-4">
@@ -1422,18 +1509,24 @@ export default function AdminPage() {
                     <input type="number" value={invoiceTaxRate} onChange={e => setInvoiceTaxRate(+e.target.value)}
                       className="w-full px-3 py-2 border border-[#e2e8f0] rounded-xl text-sm outline-none focus:ring-1 focus:ring-[#164475]" />
                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">Shipping Charges</label>
+                    <input type="number" min={0} value={invoiceShippingCharges} onChange={e => setInvoiceShippingCharges(+e.target.value)}
+                      className="w-full px-3 py-2 border border-[#e2e8f0] rounded-xl text-sm outline-none focus:ring-1 focus:ring-[#164475]" />
+                  </div>
                 </div>
                 {(() => {
                   const subtotal = invoiceItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
                   const discAmt = invoiceDiscountType === 'fixed' ? invoiceDiscountValue : (subtotal * invoiceDiscountValue) / 100;
                   const taxAmt = ((subtotal - discAmt) * invoiceTaxRate) / 100;
-                  const total = subtotal - discAmt + taxAmt;
+                  const total = subtotal - discAmt + taxAmt + invoiceShippingCharges;
                   return (
                     <div className="text-sm space-y-2 border-b border-[#f1f5f9] pb-4">
-                      <div className="flex justify-between text-[#64748b]"><span className="font-semibold">Subtotal:</span><span>${subtotal.toFixed(2)}</span></div>
-                      <div className="flex justify-between text-[#64748b]"><span className="font-semibold">Discount:</span><span>-${discAmt.toFixed(2)}</span></div>
-                      <div className="flex justify-between text-[#64748b]"><span className="font-semibold">GST Tax:</span><span>+${taxAmt.toFixed(2)}</span></div>
-                      <div className="flex justify-between text-lg font-black text-[#0a1b2d] pt-1"><span>Grand Total:</span><span>${total.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-[#64748b]"><span className="font-semibold">Subtotal:</span><span>{storeSettings.currency}{subtotal.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-[#64748b]"><span className="font-semibold">Discount:</span><span>-{storeSettings.currency}{discAmt.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-[#64748b]"><span className="font-semibold">GST Tax:</span><span>+{storeSettings.currency}{taxAmt.toFixed(2)}</span></div>
+                      {invoiceShippingCharges > 0 && <div className="flex justify-between text-[#64748b]"><span className="font-semibold">Shipping:</span><span>+{storeSettings.currency}{invoiceShippingCharges.toFixed(2)}</span></div>}
+                      <div className="flex justify-between text-lg font-black text-[#0a1b2d] pt-1"><span>Grand Total:</span><span>{storeSettings.currency}{total.toFixed(2)}</span></div>
                     </div>
                   );
                 })()}
@@ -1457,7 +1550,7 @@ export default function AdminPage() {
                           <p className="text-xs text-[#64748b]">{inv.customerName}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-extrabold text-[#0a1b2d]">${inv.total?.toFixed(2)}</p>
+                          <p className="text-sm font-extrabold text-[#0a1b2d]">{storeSettings.currency}{inv.total?.toFixed(2)}</p>
                           <p className="text-[10px] text-[#64748b]">{new Date(inv.createdAt).toLocaleDateString()}</p>
                         </div>
                       </div>
@@ -1473,6 +1566,7 @@ export default function AdminPage() {
         {/* ═══ REPORTS ═══ */}
         {activeTab === 'reports' && (
           <div className="space-y-6">
+            {/* Sub-tab navigation */}
             <div className="flex gap-2 border-b border-[#e2e8f0] pb-px flex-wrap">
               {[
                 { id: 'inventory', label: 'Inventory Report' },
@@ -1486,15 +1580,89 @@ export default function AdminPage() {
               ))}
             </div>
 
+            {/* Filters Row */}
+            <div className="bg-white rounded-2xl border border-[#e2e8f0] shadow-sm p-4 flex flex-wrap gap-3 items-end">
+              <div>
+                <label className="block text-xs font-bold text-[#64748b] uppercase tracking-wider mb-1">Start Date</label>
+                <input type="date" value={reportStartDate} onChange={e => setReportStartDate(e.target.value)}
+                  className="px-3 py-2 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#64748b] uppercase tracking-wider mb-1">End Date</label>
+                <input type="date" value={reportEndDate} onChange={e => setReportEndDate(e.target.value)}
+                  className="px-3 py-2 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none" />
+              </div>
+              {reportSubTab === 'inventory' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-[#64748b] uppercase tracking-wider mb-1">Category</label>
+                    <select value={reportCategory} onChange={e => setReportCategory(e.target.value)}
+                      className="px-3 py-2 border border-[#e2e8f0] rounded-xl text-sm bg-white focus:ring-1 focus:ring-[#164475] outline-none">
+                      {['All', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))].map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#64748b] uppercase tracking-wider mb-1">Status</label>
+                    <select value={reportStatus} onChange={e => setReportStatus(e.target.value)}
+                      className="px-3 py-2 border border-[#e2e8f0] rounded-xl text-sm bg-white focus:ring-1 focus:ring-[#164475] outline-none">
+                      {['All', 'active', 'draft'].map(s => <option key={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#64748b] uppercase tracking-wider mb-1">Stock Status</label>
+                    <select value={reportStockStatus} onChange={e => setReportStockStatus(e.target.value)}
+                      className="px-3 py-2 border border-[#e2e8f0] rounded-xl text-sm bg-white focus:ring-1 focus:ring-[#164475] outline-none">
+                      {['All', 'in stock', 'low stock', 'out of stock'].map(s => <option key={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+              <div className="ml-auto flex gap-2">
+                <button onClick={() => {
+                  const rows = reportSubTab === 'inventory'
+                    ? products.filter(p => {
+                        const matchCat = reportCategory === 'All' || p.category === reportCategory;
+                        const matchSt = reportStatus === 'All' || (p.status || 'active') === reportStatus;
+                        const invSt = getInventoryStatus(p.stock || 0, p.lowStockThreshold || 5);
+                        const matchInv = reportStockStatus === 'All' || invSt === reportStockStatus;
+                        return matchCat && matchSt && matchInv;
+                      })
+                    : reportSubTab === 'physical' ? invoices : orders;
+                  exportCSV(rows, `${reportSubTab}-report.csv`, reportSubTab === 'inventory'
+                    ? [{ key: 'name', label: 'Product' }, { key: 'code', label: 'SKU' }, { key: 'category', label: 'Category' }, { key: 'stock', label: 'Stock' }, { key: 'price', label: 'Price' }, { key: 'costPerItem', label: 'Cost' }]
+                    : reportSubTab === 'physical'
+                    ? [{ key: 'invoiceId', label: 'Invoice' }, { key: 'customerName', label: 'Customer' }, { key: 'total', label: 'Total' }, { key: 'paymentMethod', label: 'Payment' }]
+                    : [{ key: 'orderId', label: 'Order' }, { key: 'user.name', label: 'Customer' }, { key: 'total', label: 'Total' }, { key: 'orderStatus', label: 'Status' }]);
+                }} className="flex items-center gap-2 px-4 py-2 border border-[#e2e8f0] rounded-xl text-sm font-bold text-[#64748b] hover:bg-[#f8fafc] transition-colors">
+                  <Download className="w-4 h-4" /> CSV
+                </button>
+                <button onClick={() => window.print()}
+                  className="flex items-center gap-2 px-4 py-2 border border-[#e2e8f0] rounded-xl text-sm font-bold text-[#64748b] hover:bg-[#f8fafc] transition-colors">
+                  <Printer className="w-4 h-4" /> Print/PDF
+                </button>
+                <button onClick={() => {
+                  const rows = reportSubTab === 'inventory' ? filteredReportProducts : reportSubTab === 'physical' ? filteredReportInvoices : filteredReportOrders;
+                  exportCSV(rows, `${reportSubTab}-report.xls`, reportSubTab === 'inventory'
+                    ? [{ key: 'name', label: 'Product' }, { key: 'code', label: 'SKU' }, { key: 'category', label: 'Category' }, { key: 'stock', label: 'Stock' }, { key: 'price', label: 'Price' }, { key: 'costPerItem', label: 'Cost' }]
+                    : reportSubTab === 'physical'
+                    ? [{ key: 'invoiceId', label: 'Invoice' }, { key: 'customerName', label: 'Customer' }, { key: 'total', label: 'Total' }, { key: 'paymentMethod', label: 'Payment' }]
+                    : [{ key: 'orderId', label: 'Order' }, { key: 'user.name', label: 'Customer' }, { key: 'total', label: 'Total' }, { key: 'orderStatus', label: 'Status' }]);
+                }} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors">
+                  <Download className="w-4 h-4" /> Excel
+                </button>
+              </div>
+            </div>
+
+
             {reportSubTab === 'inventory' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   {[
-                    { label: 'Total Products', value: products.length },
-                    { label: 'Total Stock Units', value: products.reduce((sum, p) => sum + (p.stock || 0), 0) },
-                    { label: 'Inventory Cost Value', value: `$${products.reduce((sum, p) => sum + ((p.stock || 0) * (p.costPerItem || 0)), 0).toLocaleString()}` },
-                    { label: 'Low Stock', value: products.filter(p => getInventoryStatus(p.stock || 0, p.lowStockThreshold || 5) === 'low stock').length },
-                    { label: 'Out of Stock', value: products.filter(p => (p.stock || 0) <= 0).length },
+                    { label: 'Total Products', value: filteredReportProducts.length },
+                    { label: 'Total Stock Units', value: filteredReportProducts.reduce((sum, p) => sum + (p.stock || 0), 0) },
+                    { label: 'Inventory Cost Value', value: `${storeSettings.currency}${filteredReportProducts.reduce((sum, p) => sum + ((p.stock || 0) * (p.costPerItem || 0)), 0).toLocaleString()}` },
+                    { label: 'Low Stock', value: filteredReportProducts.filter(p => getInventoryStatus(p.stock || 0, p.lowStockThreshold || 5) === 'low stock').length },
+                    { label: 'Out of Stock', value: filteredReportProducts.filter(p => (p.stock || 0) <= 0).length },
                   ].map(({ label, value }) => (
                     <div key={label} className="bg-white rounded-2xl p-5 border border-[#e2e8f0] shadow-sm">
                       <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider mb-2">{label}</p>
@@ -1513,7 +1681,8 @@ export default function AdminPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#f1f5f9] text-sm text-[#0a1b2d]">
-                        {products.map(p => {
+                        {filteredReportProducts.length === 0 && <tr><td colSpan={11} className="px-5 py-8 text-center text-gray-500">No inventory products found.</td></tr>}
+                        {filteredReportProducts.map(p => {
                           const costVal = (p.stock || 0) * (p.costPerItem || 0);
                           const retailVal = (p.stock || 0) * p.price;
                           const profit = retailVal - costVal;
@@ -1528,11 +1697,11 @@ export default function AdminPage() {
                                 <span className={`font-bold ${invStatus === 'out of stock' ? 'text-red-600' : invStatus === 'low stock' ? 'text-amber-600' : 'text-emerald-600'}`}>{p.stock || 0}</span>
                               </td>
                               <td className="px-5 py-4 text-[#64748b]">{p.lowStockThreshold || 5}</td>
-                              <td className="px-5 py-4 text-gray-500">${p.costPerItem || 0}</td>
-                              <td className="px-5 py-4 font-semibold">${p.price}</td>
-                              <td className="px-5 py-4 text-gray-500">${costVal.toLocaleString()}</td>
-                              <td className="px-5 py-4 font-semibold">${retailVal.toLocaleString()}</td>
-                              <td className="px-5 py-4 font-extrabold text-[#164475]">${profit.toLocaleString()}</td>
+                              <td className="px-5 py-4 text-gray-500">{storeSettings.currency}{p.costPerItem || 0}</td>
+                              <td className="px-5 py-4 font-semibold">{storeSettings.currency}{p.price}</td>
+                              <td className="px-5 py-4 text-gray-500">{storeSettings.currency}{costVal.toLocaleString()}</td>
+                              <td className="px-5 py-4 font-semibold">{storeSettings.currency}{retailVal.toLocaleString()}</td>
+                              <td className="px-5 py-4 font-extrabold text-[#164475]">{storeSettings.currency}{profit.toLocaleString()}</td>
                               <td className="px-5 py-4 font-bold text-slate-500">{margin}%</td>
                             </tr>
                           );
@@ -1546,17 +1715,18 @@ export default function AdminPage() {
 
             {reportSubTab === 'physical' && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                   {(() => {
-                    const totalRev = invoices.reduce((sum, i) => sum + i.total, 0);
-                    const totalCOGS = invoices.reduce((sum, i) => sum + i.items.reduce((s: number, item: any) => s + (item.cost || 0) * item.quantity, 0), 0);
-                    const totalDisc = invoices.reduce((sum, i) => sum + (i.discountAmount || 0), 0);
-                    const totalTax = invoices.reduce((sum, i) => sum + (i.taxAmount || 0), 0);
+                    const totalRev = filteredReportInvoices.reduce((sum, i) => sum + i.total, 0);
+                    const totalCOGS = filteredReportInvoices.reduce((sum, i) => sum + i.items.reduce((s: number, item: any) => s + (item.cost || 0) * item.quantity, 0), 0);
+                    const totalDisc = filteredReportInvoices.reduce((sum, i) => sum + (i.discountAmount || 0), 0);
+                    const totalTax = filteredReportInvoices.reduce((sum, i) => sum + (i.taxAmount || 0), 0);
                     return [
-                      { label: 'Total Invoices', value: invoices.length },
-                      { label: 'Physical Revenue', value: `$${totalRev.toLocaleString()}` },
-                      { label: 'Total Discount', value: `-$${totalDisc.toLocaleString()}` },
-                      { label: 'Net Profit', value: `$${(totalRev - totalCOGS).toLocaleString()}` },
+                      { label: 'Total Invoices', value: filteredReportInvoices.length },
+                      { label: 'Physical Revenue', value: `${storeSettings.currency}${totalRev.toLocaleString()}` },
+                      { label: 'Total Discount', value: `-${storeSettings.currency}${totalDisc.toLocaleString()}` },
+                      { label: 'Total GST Tax Collected', value: `${storeSettings.currency}${totalTax.toLocaleString()}` },
+                      { label: 'Net Profit', value: `${storeSettings.currency}${(totalRev - totalCOGS).toLocaleString()}` },
                     ].map(({ label, value }) => (
                       <div key={label} className="bg-white rounded-2xl p-5 border border-[#e2e8f0] shadow-sm">
                         <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider mb-2">{label}</p>
@@ -1574,8 +1744,8 @@ export default function AdminPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#f1f5f9] text-sm text-[#0a1b2d]">
-                        {invoices.length === 0 && <tr><td colSpan={8} className="px-5 py-8 text-center text-gray-500">No invoices found.</td></tr>}
-                        {invoices.map(i => {
+                        {filteredReportInvoices.length === 0 && <tr><td colSpan={8} className="px-5 py-8 text-center text-gray-500">No invoices found.</td></tr>}
+                        {filteredReportInvoices.map(i => {
                           const cogs = i.items.reduce((s: number, item: any) => s + (item.cost || 0) * item.quantity, 0);
                           return (
                             <tr key={i._id} onClick={() => setSelectedInvoiceDetail(i)} className="hover:bg-[#fafbfc] cursor-pointer">
@@ -1583,10 +1753,10 @@ export default function AdminPage() {
                               <td className="px-5 py-4 font-semibold">{i.customerName}</td>
                               <td className="px-5 py-4 text-[#64748b]">{new Date(i.createdAt).toLocaleDateString()}</td>
                               <td className="px-5 py-4 text-center">{i.items.length}</td>
-                              <td className="px-5 py-4 text-red-500">-${i.discountAmount || 0}</td>
-                              <td className="px-5 py-4 text-gray-500">${i.taxAmount || 0}</td>
-                              <td className="px-5 py-4 font-bold">${i.total.toLocaleString()}</td>
-                              <td className="px-5 py-4 font-extrabold text-[#164475]">${(i.total - cogs).toLocaleString()}</td>
+                              <td className="px-5 py-4 text-red-500">-{storeSettings.currency}{i.discountAmount || 0}</td>
+                              <td className="px-5 py-4 text-gray-500">{storeSettings.currency}{i.taxAmount || 0}</td>
+                              <td className="px-5 py-4 font-bold">{storeSettings.currency}{i.total.toLocaleString()}</td>
+                              <td className="px-5 py-4 font-extrabold text-[#164475]">{storeSettings.currency}{(i.total - cogs).toLocaleString()}</td>
                             </tr>
                           );
                         })}
@@ -1601,7 +1771,7 @@ export default function AdminPage() {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   {(() => {
-                    const active = orders.filter(o => o.orderStatus !== 'cancelled');
+                    const active = filteredReportOrders.filter(o => o.orderStatus !== 'cancelled');
                     const rev = active.reduce((sum, o) => sum + o.total, 0);
                     const cogs = active.reduce((sum, o) => {
                       return sum + (o.items?.reduce((is: number, item: any) => {
@@ -1611,9 +1781,9 @@ export default function AdminPage() {
                     }, 0);
                     return [
                       { label: 'Online Orders', value: active.length },
-                      { label: 'Online Revenue', value: `$${rev.toLocaleString()}` },
-                      { label: 'Est. Cost of Goods', value: `$${cogs.toLocaleString()}` },
-                      { label: 'Online Net Profit', value: `$${(rev - cogs).toLocaleString()}` },
+                      { label: 'Online Revenue', value: `${storeSettings.currency}${rev.toLocaleString()}` },
+                      { label: 'Est. Cost of Goods', value: `${storeSettings.currency}${cogs.toLocaleString()}` },
+                      { label: 'Online Net Profit', value: `${storeSettings.currency}${(rev - cogs).toLocaleString()}` },
                     ].map(({ label, value }) => (
                       <div key={label} className="bg-white rounded-2xl p-5 border border-[#e2e8f0] shadow-sm">
                         <p className="text-xs font-bold text-[#64748b] uppercase tracking-wider mb-2">{label}</p>
@@ -1631,8 +1801,8 @@ export default function AdminPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#f1f5f9] text-sm text-[#0a1b2d]">
-                        {orders.length === 0 && <tr><td colSpan={7} className="px-5 py-8 text-center text-gray-500">No orders found.</td></tr>}
-                        {orders.map(o => {
+                        {filteredReportOrders.length === 0 && <tr><td colSpan={7} className="px-5 py-8 text-center text-gray-500">No orders found.</td></tr>}
+                        {filteredReportOrders.map(o => {
                           const cogs = o.items?.reduce((is: number, item: any) => {
                             const matched = products.find(p => p._id === item.product || p.id === item.product);
                             return is + (matched ? (matched.costPerItem || 0) : Math.round(item.price * 0.65)) * item.quantity;
@@ -1645,8 +1815,8 @@ export default function AdminPage() {
                               <td className="px-5 py-4 text-[#64748b]">{new Date(o.createdAt).toLocaleDateString()}</td>
                               <td className="px-5 py-4"><StatusBadge s={o.orderStatus} /></td>
                               <td className="px-5 py-4 capitalize text-[#64748b]">{o.paymentMethod}</td>
-                              <td className="px-5 py-4 font-bold">${o.total.toLocaleString()}</td>
-                              <td className="px-5 py-4 font-extrabold text-[#164475]">${profit.toLocaleString()}</td>
+                              <td className="px-5 py-4 font-bold">{storeSettings.currency}{o.total.toLocaleString()}</td>
+                              <td className="px-5 py-4 font-extrabold text-[#164475]">{storeSettings.currency}{profit.toLocaleString()}</td>
                             </tr>
                           );
                         })}
@@ -1656,6 +1826,66 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ═══ SETTINGS ═══ */}
+        {activeTab === 'settings' && (
+          <div className="bg-white rounded-2xl border border-[#e2e8f0] shadow-sm p-6 max-w-2xl space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-[#0a1b2d]">Store Settings</h2>
+              <p className="text-xs text-[#64748b] mt-1">Configure your store information, tax rates, and default currency.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">Store Name</label>
+                <input value={storeSettings.storeName} onChange={e => setStoreSettings({ ...storeSettings, storeName: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">Store Phone</label>
+                <input value={storeSettings.storePhone} onChange={e => setStoreSettings({ ...storeSettings, storePhone: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">Store Email</label>
+                <input value={storeSettings.storeEmail} onChange={e => setStoreSettings({ ...storeSettings, storeEmail: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">GST/Tax Number</label>
+                <input value={storeSettings.gstNumber} onChange={e => setStoreSettings({ ...storeSettings, gstNumber: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">Currency Symbol</label>
+                <input value={storeSettings.currency} onChange={e => setStoreSettings({ ...storeSettings, currency: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">Default GST/Tax Rate (%)</label>
+                <input type="number" value={storeSettings.defaultTaxRate} onChange={e => setStoreSettings({ ...storeSettings, defaultTaxRate: Number(e.target.value) })}
+                  className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">Store Address</label>
+              <textarea value={storeSettings.storeAddress} onChange={e => setStoreSettings({ ...storeSettings, storeAddress: e.target.value })}
+                rows={3} className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none resize-none" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#0a1b2d] mb-1.5">Invoice Terms & Conditions</label>
+              <textarea value={storeSettings.terms} onChange={e => setStoreSettings({ ...storeSettings, terms: e.target.value })}
+                rows={4} className="w-full px-4 py-2.5 border border-[#e2e8f0] rounded-xl text-sm focus:ring-1 focus:ring-[#164475] outline-none" />
+            </div>
+
+            <button onClick={handleSaveSettings}
+              className="w-full py-3 bg-[#164475] hover:bg-[#0a1b2d] text-white rounded-xl text-sm font-bold transition-colors shadow-lg shadow-[#164475]/20">
+              Save Settings
+            </button>
           </div>
         )}
       </main>
@@ -1823,6 +2053,44 @@ export default function AdminPage() {
                       <span className="text-[#64748b]">{o.user?.name || 'Guest'}</span>
                       <span className="text-[#64748b]">{new Date(o.createdAt).toLocaleDateString()}</span>
                       <StatusBadge s={o.orderStatus} />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Related Store Invoices */}
+            <div>
+              <h4 className="font-bold text-[#0a1b2d] text-sm mb-3">Related Store Invoices</h4>
+              <div className="space-y-2">
+                {invoices.filter(inv => inv.items.some((item: any) => item.productId === (selectedProductDetail._id || selectedProductDetail.id))).length === 0 ? (
+                  <p className="text-xs text-[#64748b]">No store invoice transactions found for this product.</p>
+                ) : (
+                  invoices.filter(inv => inv.items.some((item: any) => item.productId === (selectedProductDetail._id || selectedProductDetail.id))).map(inv => (
+                    <div key={inv._id} className="flex items-center justify-between bg-[#f8fafc] p-3 rounded-xl border border-[#e2e8f0] text-sm">
+                      <span className="font-mono text-[#164475] font-bold">{inv.invoiceId}</span>
+                      <span className="text-[#64748b]">{inv.customerName}</span>
+                      <span className="text-[#64748b]">{new Date(inv.createdAt).toLocaleDateString()}</span>
+                      <span className="font-bold text-[#0a1b2d]">{storeSettings.currency}{inv.total}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Inventory Movement History */}
+            <div>
+              <h4 className="font-bold text-[#0a1b2d] text-sm mb-3">Inventory Movement History</h4>
+              <div className="space-y-2">
+                {inventoryLog.filter(l => l.productId === (selectedProductDetail._id || selectedProductDetail.id)).length === 0 ? (
+                  <p className="text-xs text-[#64748b]">No manual adjustments recorded.</p>
+                ) : (
+                  inventoryLog.filter(l => l.productId === (selectedProductDetail._id || selectedProductDetail.id)).map((log, i) => (
+                    <div key={i} className="flex items-center justify-between bg-[#f8fafc] p-3 rounded-xl border border-[#e2e8f0] text-sm">
+                      <span className="text-[#64748b] text-xs">{new Date(log.date).toLocaleString()}</span>
+                      <StatusBadge s={log.type === 'Stock In' ? 'active' : log.type === 'Stock Out' ? 'cancelled' : 'processing'} />
+                      <span className={`font-bold ${log.qty > 0 ? 'text-emerald-600' : 'text-red-600'}`}>{log.qty > 0 ? `+${log.qty}` : log.qty}</span>
+                      <span className="text-[#64748b]">{log.before} → {log.after}</span>
                     </div>
                   ))
                 )}
@@ -2071,80 +2339,86 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="p-4 space-y-6">
-              <div className="flex justify-between items-start border-b-2 border-[#164475] pb-6">
-                <div>
-                  <h1 className="text-3xl font-black tracking-tight text-[#0a1b2d]">ADAMJEE COMPUTERS</h1>
-                  <p className="text-xs text-[#64748b] font-semibold mt-1">Pakistan's Premium Gaming & Desktop Hardware Store</p>
-                  <p className="text-xs text-[#64748b]">Regal Plaza, Saddar, Karachi, Pakistan</p>
-                  <p className="text-xs text-[#64748b]">WhatsApp: +92 300 0000000 | support@adamjeecomputers.com</p>
-                </div>
-                <div className="text-right">
-                  <div className="inline-block bg-[#0a1b2d] text-white text-xs font-extrabold uppercase px-3 py-1 rounded-md mb-2">OFFLINE INVOICE</div>
-                  <h2 className="text-xl font-bold text-[#0a1b2d] font-mono">{showPrintInvoice.invoiceId}</h2>
-                  <p className="text-xs text-[#64748b]"><span className="font-semibold">Date:</span> {new Date(showPrintInvoice.createdAt).toLocaleDateString()}</p>
-                  <p className="text-xs text-[#64748b]"><span className="font-semibold">Payment:</span> {showPrintInvoice.paymentMethod}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <div>
-                  <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-[#164475] mb-2">Billed To</h4>
-                  <p className="text-sm font-bold text-[#0a1b2d]">{showPrintInvoice.customerName}</p>
-                  {showPrintInvoice.customerPhone && <p className="text-xs text-[#64748b] mt-0.5">Ph: {showPrintInvoice.customerPhone}</p>}
-                  {showPrintInvoice.customerEmail && <p className="text-xs text-[#64748b]">Email: {showPrintInvoice.customerEmail}</p>}
-                </div>
-                <div>
-                  <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-[#164475] mb-2">Terms & Conditions</h4>
-                  <p className="text-[10px] text-[#64748b] leading-tight">
-                    1. 1 Year warranty on premium products.<br/>
-                    2. 7-day window for hardware check/returns.<br/>
-                    3. No returns on burned, damaged, or modified parts.
-                  </p>
-                </div>
-              </div>
-
-              <table className="w-full text-left text-sm border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-slate-200 text-[#0a1b2d] font-extrabold text-xs uppercase">
-                    <th className="py-2.5">Item Description</th>
-                    <th className="text-right py-2.5">Unit Price</th>
-                    <th className="text-center py-2.5">Qty</th>
-                    <th className="text-right py-2.5">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {showPrintInvoice.items?.map((item: any, idx: number) => (
-                    <tr key={idx} className="text-[#0a1b2d]">
-                      <td className="py-3 font-medium">{item.name}</td>
-                      <td className="text-right py-3">${item.price?.toFixed(2)}</td>
-                      <td className="text-center py-3">{item.quantity}</td>
-                      <td className="text-right py-3 font-bold">${(item.price * item.quantity)?.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="flex justify-end pt-4 border-t border-slate-100">
-                <div className="w-72 text-sm space-y-2 text-[#0a1b2d]">
-                  <div className="flex justify-between text-[#64748b]"><span className="font-semibold">Subtotal:</span><span>${showPrintInvoice.subtotal?.toFixed(2)}</span></div>
-                  {showPrintInvoice.discountAmount > 0 && (
-                    <div className="flex justify-between text-[#64748b]">
-                      <span className="font-semibold">Discount ({showPrintInvoice.discountType === 'percentage' ? `${showPrintInvoice.discountValue}%` : 'Fixed'}):</span>
-                      <span>-${showPrintInvoice.discountAmount?.toFixed(2)}</span>
+                <div className="p-4 space-y-6">
+                  <div className="flex justify-between items-start border-b-2 border-[#164475] pb-6">
+                    <div>
+                      <h1 className="text-3xl font-black tracking-tight text-[#0a1b2d]">{activeStoreSettings.storeName.toUpperCase()}</h1>
+                      <p className="text-xs text-[#64748b] font-semibold mt-1">Pakistan's Premium Gaming & Desktop Hardware Store</p>
+                      <p className="text-xs text-[#64748b]">{activeStoreSettings.storeAddress}</p>
+                      <p className="text-xs text-[#64748b]">WhatsApp: {activeStoreSettings.storePhone} | {activeStoreSettings.storeEmail}</p>
+                      {activeStoreSettings.gstNumber && <p className="text-xs text-[#64748b]"><span className="font-semibold">GST:</span> {activeStoreSettings.gstNumber}</p>}
                     </div>
-                  )}
-                  {showPrintInvoice.taxAmount > 0 && (
-                    <div className="flex justify-between text-[#64748b]">
-                      <span className="font-semibold">GST ({showPrintInvoice.taxRate}%):</span>
-                      <span>+${showPrintInvoice.taxAmount?.toFixed(2)}</span>
+                    <div className="text-right">
+                      <div className="inline-block bg-[#0a1b2d] text-white text-xs font-extrabold uppercase px-3 py-1 rounded-md mb-2">OFFLINE INVOICE</div>
+                      <h2 className="text-xl font-bold text-[#0a1b2d] font-mono">{showPrintInvoice.invoiceId}</h2>
+                      <p className="text-xs text-[#64748b]"><span className="font-semibold">Date:</span> {new Date(showPrintInvoice.createdAt).toLocaleDateString()}</p>
+                      <p className="text-xs text-[#64748b]"><span className="font-semibold">Payment:</span> {showPrintInvoice.paymentMethod}</p>
                     </div>
-                  )}
-                  <div className="flex justify-between text-lg font-black bg-[#164475]/5 px-3 py-2 rounded-xl text-[#0a1b2d] border-t-2 border-[#164475] mt-1">
-                    <span>Total Bill:</span><span>${showPrintInvoice.total?.toFixed(2)}</span>
                   </div>
-                </div>
-              </div>
+
+                  <div className="grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div>
+                      <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-[#164475] mb-2">Billed To</h4>
+                      <p className="text-sm font-bold text-[#0a1b2d]">{showPrintInvoice.customerName}</p>
+                      {showPrintInvoice.customerPhone && <p className="text-xs text-[#64748b] mt-0.5">Ph: {showPrintInvoice.customerPhone}</p>}
+                      {showPrintInvoice.customerEmail && <p className="text-xs text-[#64748b]">Email: {showPrintInvoice.customerEmail}</p>}
+                      {showPrintInvoice.customerAddress && <p className="text-xs text-[#64748b] mt-1 whitespace-pre-wrap"><span className="font-semibold">Address:</span> {showPrintInvoice.customerAddress}</p>}
+                    </div>
+                    <div>
+                      <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-[#164475] mb-2">Terms & Conditions</h4>
+                      <p className="text-[10px] text-[#64748b] leading-tight whitespace-pre-wrap">
+                        {activeStoreSettings.terms}
+                      </p>
+                    </div>
+                  </div>
+
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-slate-200 text-[#0a1b2d] font-extrabold text-xs uppercase">
+                        <th className="py-2.5">Item Description</th>
+                        <th className="text-right py-2.5">Unit Price</th>
+                        <th className="text-center py-2.5">Qty</th>
+                        <th className="text-right py-2.5">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {showPrintInvoice.items?.map((item: any, idx: number) => (
+                        <tr key={idx} className="text-[#0a1b2d]">
+                          <td className="py-3 font-medium">{item.name}</td>
+                          <td className="text-right py-3">{activeStoreSettings.currency}{item.price?.toFixed(2)}</td>
+                          <td className="text-center py-3">{item.quantity}</td>
+                          <td className="text-right py-3 font-bold">{activeStoreSettings.currency}{(item.price * item.quantity)?.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="flex justify-end pt-4 border-t border-slate-100">
+                    <div className="w-72 text-sm space-y-2 text-[#0a1b2d]">
+                      <div className="flex justify-between text-[#64748b]"><span className="font-semibold">Subtotal:</span><span>{activeStoreSettings.currency}{showPrintInvoice.subtotal?.toFixed(2)}</span></div>
+                      {showPrintInvoice.discountAmount > 0 && (
+                        <div className="flex justify-between text-[#64748b]">
+                          <span className="font-semibold">Discount ({showPrintInvoice.discountType === 'percentage' ? `${showPrintInvoice.discountValue}%` : 'Fixed'}):</span>
+                          <span>-{showPrintInvoice.discountType === 'percentage' ? '' : activeStoreSettings.currency}{showPrintInvoice.discountAmount?.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {showPrintInvoice.taxAmount > 0 && (
+                        <div className="flex justify-between text-[#64748b]">
+                          <span className="font-semibold">GST ({showPrintInvoice.taxRate}%):</span>
+                          <span>+{activeStoreSettings.currency}{showPrintInvoice.taxAmount?.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {showPrintInvoice.shippingCharges > 0 && (
+                        <div className="flex justify-between text-[#64748b]">
+                          <span className="font-semibold">Shipping:</span>
+                          <span>+{activeStoreSettings.currency}{showPrintInvoice.shippingCharges?.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-lg font-black bg-[#164475]/5 px-3 py-2 rounded-xl text-[#0a1b2d] border-t-2 border-[#164475] mt-1">
+                        <span>Total Bill:</span><span>{activeStoreSettings.currency}{showPrintInvoice.total?.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
 
               {showPrintInvoice.notes && (
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs">
