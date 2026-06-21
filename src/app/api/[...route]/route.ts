@@ -11,7 +11,8 @@ import {
   mockUsersMemory,
   mockProductsMemory,
   mockOrdersMemory,
-  mockContactsMemory
+  mockContactsMemory,
+  mockInvoicesMemory
 } from '@/lib/mockDb';
 
 import User from '@/lib/models/User';
@@ -19,6 +20,7 @@ import Product from '@/lib/models/Product';
 import Order from '@/lib/models/Order';
 import Contact from '@/lib/models/Contact';
 import ChatSession from '@/lib/models/ChatSession';
+import Invoice from '@/lib/models/Invoice';
 
 export const dynamic = 'force-dynamic';
 
@@ -262,6 +264,41 @@ export async function GET(req: Request, { params }: { params: Promise<{ route: s
       return NextResponse.json({ success: true, data: contacts });
     }
 
+    // Invoices Endpoint: GET /api/invoices (Admin)
+    if (pathStr === 'invoices') {
+      const user = await getAuthenticatedUser(req);
+      if (!isAdmin(user)) {
+        return NextResponse.json({ success: false, message: 'Access denied. Admins only.' }, { status: 403 });
+      }
+
+      if (mongoose.connection.readyState !== 1) {
+        return NextResponse.json({ success: true, invoices: mockInvoicesMemory, total: mockInvoicesMemory.length });
+      }
+
+      const invoices = await Invoice.find({}).sort({ createdAt: -1 });
+      return NextResponse.json({ success: true, invoices, total: invoices.length });
+    }
+
+    // Single Invoice Endpoint: GET /api/invoices/:invoiceId (Admin)
+    if (route[0] === 'invoices' && route.length === 2) {
+      const user = await getAuthenticatedUser(req);
+      if (!isAdmin(user)) {
+        return NextResponse.json({ success: false, message: 'Access denied. Admins only.' }, { status: 403 });
+      }
+
+      const invoiceId = route[1];
+
+      if (mongoose.connection.readyState !== 1) {
+        const invoice = mockInvoicesMemory.find(i => i.invoiceId === invoiceId || i._id === invoiceId);
+        if (!invoice) return NextResponse.json({ success: false, message: 'Invoice not found' }, { status: 404 });
+        return NextResponse.json({ success: true, invoice });
+      }
+
+      const invoice = await Invoice.findOne({ $or: [{ invoiceId }, { _id: invoiceId.match(/^[0-9a-fA-F]{24}$/) ? invoiceId : null }] });
+      if (!invoice) return NextResponse.json({ success: false, message: 'Invoice not found' }, { status: 404 });
+      return NextResponse.json({ success: true, invoice });
+    }
+
     // 8. Admin Dashboard Stats: GET /api/admin/stats
     if (pathStr === 'admin/stats') {
       const user = await getAuthenticatedUser(req);
@@ -283,6 +320,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ route: s
             revenue: { total: mockOrdersMemory.reduce((sum, o) => sum + o.total, 0), growth: 0 },
             chatbot: { totalSessions: 1, escalated: 0 },
             recentOrders: mockOrdersMemory.slice(0, 5),
+            invoices: {
+              total: mockInvoicesMemory.length,
+              revenue: mockInvoicesMemory.reduce((sum, i) => sum + i.total, 0),
+            }
           }
         });
       }
@@ -299,6 +340,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ route: s
         pendingOrders, processingOrders, shippedOrders, deliveredOrders,
         totalChatSessions, escalatedChats,
         recentOrders,
+        totalInvoices, invoiceRevenueResult
       ] = await Promise.all([
         User.countDocuments({ role: 'customer' }),
         User.countDocuments({ role: 'customer', createdAt: { $gte: thisMonthStart } }),
@@ -315,6 +357,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ route: s
         ChatSession.countDocuments(),
         ChatSession.countDocuments({ escalatedToHuman: true }),
         Order.find().sort({ createdAt: -1 }).limit(5).populate('user', 'name email').select('orderId total orderStatus paymentMethod createdAt'),
+        Invoice.countDocuments(),
+        Invoice.aggregate([{ $group: { _id: null, total: { $sum: '$total' } } }])
       ]);
 
       const totalRevenue = revenueResult[0]?.total || 0;
@@ -322,6 +366,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ route: s
       const revenueGrowth = lastMonthRevenue > 0
         ? (((totalRevenue - lastMonthRevenue) / lastMonthRevenue) * 100).toFixed(1)
         : 0;
+
+      const totalInvoiceRevenue = invoiceRevenueResult[0]?.total || 0;
 
       return NextResponse.json({
         success: true,
@@ -335,6 +381,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ route: s
           revenue: { total: totalRevenue, growth: revenueGrowth },
           chatbot: { totalSessions: totalChatSessions, escalated: escalatedChats },
           recentOrders,
+          invoices: {
+            total: totalInvoices,
+            revenue: totalInvoiceRevenue,
+          }
         },
       });
     }
@@ -652,6 +702,73 @@ export async function POST(req: Request, { params }: { params: Promise<{ route: 
 
       const product = await Product.create(body);
       return NextResponse.json({ success: true, product }, { status: 201 });
+    }
+
+    // Invoices: POST /api/invoices (Create Invoice, Admin)
+    if (pathStr === 'invoices') {
+      const user = await getAuthenticatedUser(req);
+      if (!isAdmin(user)) {
+        return NextResponse.json({ success: false, message: 'Access denied. Admins only.' }, { status: 403 });
+      }
+
+      const { customerName, customerEmail, customerPhone, items, discountType, discountValue, discountAmount, taxRate, taxAmount, subtotal, total, paymentMethod, notes } = body;
+
+      if (!customerName || !items || items.length === 0) {
+        return NextResponse.json({ success: false, message: 'Customer name and items are required' }, { status: 400 });
+      }
+
+      if (mongoose.connection.readyState !== 1) {
+        const newId = new mongoose.Types.ObjectId().toString();
+        const invoiceId = `INV-${String(mockInvoicesMemory.length + 1).padStart(4, '0')}`;
+        
+        // Deduct mock stock
+        for (const item of items) {
+          if (item.productId) {
+            const prod = mockProductsMemory.find(p => p._id === item.productId || p.id === item.productId);
+            if (prod && prod.stock !== undefined && prod.trackQuantity) {
+              prod.stock = Math.max(0, prod.stock - item.quantity);
+            }
+          }
+        }
+
+        const newInvoice = {
+          _id: newId,
+          invoiceId,
+          customerName,
+          customerEmail: customerEmail || '',
+          customerPhone: customerPhone || '',
+          items,
+          discountType: discountType || 'fixed',
+          discountValue: discountValue || 0,
+          discountAmount: discountAmount || 0,
+          taxRate: taxRate || 0,
+          taxAmount: taxAmount || 0,
+          subtotal,
+          total,
+          paymentMethod: paymentMethod || 'Cash',
+          notes: notes || '',
+          createdAt: new Date().toISOString()
+        };
+        mockInvoicesMemory.unshift(newInvoice);
+        return NextResponse.json({ success: true, message: 'Invoice generated successfully (Mock mode)!', invoice: newInvoice }, { status: 201 });
+      }
+
+      // Live DB Mode
+      for (const item of items) {
+        if (item.productId) {
+          const dbProd = await Product.findById(item.productId);
+          if (dbProd && dbProd.trackQuantity) {
+            dbProd.stock = Math.max(0, dbProd.stock - item.quantity);
+            await dbProd.save();
+          }
+        }
+      }
+
+      const invoice = await Invoice.create({
+        customerName, customerEmail, customerPhone, items, discountType, discountValue, discountAmount, taxRate, taxAmount, subtotal, total, paymentMethod, notes
+      });
+
+      return NextResponse.json({ success: true, message: 'Invoice generated successfully!', invoice }, { status: 201 });
     }
 
     // 5. Product Review Endpoint: POST /api/products/:id/reviews
@@ -1118,6 +1235,27 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ route
       }
       await contact.deleteOne();
       return NextResponse.json({ success: true, message: 'Message deleted' });
+    }
+
+    // 3. Delete Invoice: DELETE /api/invoices/:id
+    if (route[0] === 'invoices' && route.length === 2) {
+      const user = await getAuthenticatedUser(req);
+      if (!isAdmin(user)) {
+        return NextResponse.json({ success: false, message: 'Access denied. Admins only.' }, { status: 403 });
+      }
+
+      const invoiceId = route[1];
+
+      if (mongoose.connection.readyState !== 1) {
+        const index = mockInvoicesMemory.findIndex(i => i._id === invoiceId || i.invoiceId === invoiceId);
+        if (index === -1) return NextResponse.json({ success: false, message: 'Invoice not found' }, { status: 404 });
+        mockInvoicesMemory.splice(index, 1);
+        return NextResponse.json({ success: true, message: 'Invoice deleted successfully (Mock mode)' });
+      }
+
+      const invoice = await Invoice.findByIdAndDelete(invoiceId);
+      if (!invoice) return NextResponse.json({ success: false, message: 'Invoice not found' }, { status: 404 });
+      return NextResponse.json({ success: true, message: 'Invoice deleted successfully' });
     }
 
     return NextResponse.json({ success: false, message: 'Route not found' }, { status: 404 });

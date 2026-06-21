@@ -8,24 +8,29 @@ export const CURRENCIES = {
 export const NEW_ARRIVALS: Product[] = [
   {
     id: "na1",
-    name: "29\" Inch LED DELL",
+    name: "Dell UltraSharp 29\" UltraWide LED Monitor",
     code: "Code u2917w",
     price: 500.00,
     rating: 5.0,
     image: "/images/dell_led_monitor_1780238004077.png",
+    category: "Accessories",
     tag: "New",
+    description: "The Dell UltraSharp U2917W is a 29-inch UltraWide IPS monitor designed to enhance productivity and streamline multitasking. With its 21:9 aspect ratio and 2560×1080 resolution, it offers significantly more horizontal screen space.",
     additionalImages: [
-      "/images/dell_led_monitor_1780238004077.png"
+      "/images/dell_led_monitor_1780238004077.png",
+      "/images/rog_monitor_new.png"
     ]
   },
   {
     id: "na2",
-    name: "Aftershock Oden",
+    name: "Aftershock Oden Mechanical Gaming Keyboard",
     code: "Code asmkb87-2020",
     price: 500.00,
     rating: 5.0,
     image: "/images/mechanical_keyboard_1780238028029.png",
+    category: "Accessories",
     tag: "Hot",
+    description: "The Aftershock Oden is a tenkeyless mechanical gaming keyboard built with Cherry MX switches. Featuring per-key RGB, N-key rollover, and a premium aluminium top plate.",
     additionalImages: [
       "/images/mechanical_keyboard_1780238028029.png",
       "/images/mechanical_keyboard_1780238028029.png",
@@ -34,12 +39,14 @@ export const NEW_ARRIVALS: Product[] = [
   },
   {
     id: "na3",
-    name: "Aftershock Oden",
-    code: "Code asmkb87-2020",
-    price: 500.00,
+    name: "ASUS RTX 4080 Gaming Graphics Card",
+    code: "Code RTX-4080-ASUS",
+    price: 999.00,
     rating: 5.0,
     image: "/images/rtx_graphics_card_1780238052630.png",
+    category: "Accessories",
     tag: "New",
+    description: "The ASUS RTX 4080 delivers next-generation Ada Lovelace performance with 16GB GDDR6X VRAM, real-time ray tracing, and DLSS 3.5 frame generation for the ultimate 4K gaming experience.",
     additionalImages: [
       "/images/rtx_graphics_card_1780238052630.png",
       "/images/rtx_graphics_card_1780238052630.png"
@@ -47,12 +54,14 @@ export const NEW_ARRIVALS: Product[] = [
   },
   {
     id: "na4",
-    name: "29\" Inch LED DELL",
-    code: "Code u2917w",
-    price: 500.00,
+    name: "AMD Ryzen 9 7900X3D Processor",
+    code: "Code AMD-R9-7900X3D",
+    price: 549.00,
     rating: 5.0,
     image: "/images/ryzen_processor_box_1780238074653.png",
+    category: "Accessories",
     tag: "Hot",
+    description: "The AMD Ryzen 9 7900X3D combines 12 Zen 4 cores with AMD 3D V-Cache technology, delivering unprecedented gaming and multithreaded performance on the AM5 platform.",
     additionalImages: [
       "/images/ryzen_processor_box_1780238074653.png",
       "/images/ryzen_processor_box_1780238074653.png"
@@ -60,24 +69,28 @@ export const NEW_ARRIVALS: Product[] = [
   },
   {
     id: "na5",
-    name: "29\" Inch LED DELL",
-    code: "Code u2917w",
-    price: 500.00,
+    name: "Corsair Vengeance RGB 32GB DDR5 RAM",
+    code: "Code CMH32GX5M2",
+    price: 125.00,
     rating: 5.0,
     image: "/images/corsair_rgb_ram_1780238095594.png",
+    category: "Accessories",
     tag: "New",
+    description: "Corsair Vengeance RGB DDR5-6000MHz 32GB dual-channel kit with XMP 3.0 and EXPO support. Individual per-stick iCUE RGB lighting with low-profile 44mm aluminium heatspreader.",
     additionalImages: [
       "/images/corsair_rgb_ram_1780238095594.png"
     ]
   },
   {
     id: "na6",
-    name: "29\" Inch LED DELL",
-    code: "Code u2917w",
-    price: 500.00,
+    name: "GameSir T4 Cyclone Pro Controller",
+    code: "Code GAMESIR-T4-PRO",
+    price: 59.00,
     rating: 5.0,
     image: "/images/gamesir_controller_1780238117003.png",
+    category: "Accessories",
     tag: "Hot",
+    description: "The GameSir T4 Cyclone Pro features Hall-effect joystick sensors for zero drift, 2.4GHz ultra-low latency wireless, and universal compatibility across PC, Android, iOS, and Nintendo Switch.",
     additionalImages: [
       "/images/gamesir_controller_1780238117003.png",
       "/images/gamesir_controller_1780238117003.png",
@@ -257,7 +270,8 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 4.8,
     image: "/images/headphones_red_black_1780246535746.png",
     category: "Headphones",
-    tag: "Hot"
+    tag: "Hot",
+    description: "The ASUS ROG Gaming Headset delivers immersive 7.1 surround sound with premium 50mm neodymium drivers. Features a detachable noise-cancelling boom mic, memory foam ear cushions, and RGB lighting for your battle station."
   },
   {
     id: "hp2",
@@ -267,7 +281,8 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 5.0,
     image: "/images/3d_gaming_headset.png",
     category: "Headphones",
-    tag: "New"
+    tag: "New",
+    description: "Experience true wireless freedom with this Premium 3D Gaming Headset. Bluetooth 5.2 with 40-hour battery life, Hi-Res Audio certified, and virtual 3D spatial audio for unmatched immersion."
   },
   {
     id: "hp3",
@@ -276,7 +291,8 @@ export const ALL_PRODUCTS: Product[] = [
     price: 120.00,
     rating: 4.7,
     image: "/images/rgb_gaming_headphones_1780227081148.png",
-    category: "Headphones"
+    category: "Headphones",
+    description: "Premium RGB Gaming Headphones with 50mm drivers and virtual 7.1 surround sound. Foldable design with memory foam ear cups and a flexible microphone for crystal-clear team communication."
   },
   {
     id: "hp4",
@@ -286,7 +302,8 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 4.9,
     image: "/images/headphones_deal_1780250259718.png",
     category: "Headphones",
-    tag: "20% OFF"
+    tag: "20% OFF",
+    description: "Professional-grade Active Noise Cancellation with three ANC modes. Hi-Res Audio, 30-hour battery, USB-C fast charging, and multi-device pairing for seamless switching between PC and mobile."
   },
 
   // Earphones (3)
@@ -298,7 +315,8 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 4.9,
     image: "/images/tws_blue_earbuds_1780227103510.png",
     category: "Earphones",
-    tag: "Hot"
+    tag: "Hot",
+    description: "True Wireless earbuds with Bluetooth 5.3, Active Noise Cancellation, and 8+32hr total battery life. IPX5 water resistant with premium 10mm titanium-coated drivers for deep bass and crisp highs."
   },
   {
     id: "ep2",
@@ -308,7 +326,8 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 4.7,
     image: "/images/new_earbuds_transparent.png",
     category: "Earphones",
-    tag: "New"
+    tag: "New",
+    description: "Sport-optimized wireless earbuds with secure ear-hook design, IPX7 waterproofing, and 6-hour playtime per charge. Perfect for workouts, commutes, and all-day listening."
   },
   {
     id: "ep3",
@@ -317,7 +336,8 @@ export const ALL_PRODUCTS: Product[] = [
     price: 49.00,
     rating: 4.5,
     image: "/images/new_earbuds_transparent.png",
-    category: "Earphones"
+    category: "Earphones",
+    description: "Studio-grade wired in-ear monitors with dual-driver hybrid system (dynamic + balanced armature). Detachable 3.5mm cable with inline mic for calls. Perfect for audiophiles and content creators."
   },
 
   // Speakers (2)
@@ -329,7 +349,8 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 5.0,
     image: "/images/image 117.png",
     category: "Speakers",
-    tag: "Hot"
+    tag: "Hot",
+    description: "The LD Systems Premium Bluetooth Speaker delivers 120W RMS with a 2.1 channel system. Deep bass subwoofer, optical and AUX inputs, RGB sync lighting, and wireless multi-room audio support."
   },
   {
     id: "sp2",
@@ -339,7 +360,8 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 4.7,
     image: "/images/image 122.png",
     category: "Speakers",
-    tag: "New"
+    tag: "New",
+    description: "Compact RGB gaming soundbar with 60W stereo output and built-in subwoofer. USB, optical, and Bluetooth connectivity. RGB lighting syncs with your gaming setup for the ultimate aesthetic."
   },
 
   // Accessories (6)
@@ -350,7 +372,8 @@ export const ALL_PRODUCTS: Product[] = [
     price: 45.00,
     rating: 4.8,
     image: "/images/gaming_mouse_rgb_new.png",
-    category: "Accessories"
+    category: "Accessories",
+    description: "High-precision RGB gaming mouse with PixArt optical sensor, 6400 DPI, 6 programmable buttons, and ergonomic design. Braided USB cable and PTFE feet for smooth gliding on any surface."
   },
   {
     id: "ac2",
@@ -360,7 +383,8 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 5.0,
     image: "/images/gaming_chair_blue_1780246513295.png",
     category: "Accessories",
-    tag: "Hot"
+    tag: "Hot",
+    description: "Premium ergonomic gaming chair with lumbar and neck memory foam pillows, 4D adjustable armrests, 155° recline, and class-4 hydraulic gas lift. Supports up to 150kg with PU leather upholstery."
   },
   {
     id: "ac3",
@@ -370,35 +394,39 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 5.0,
     image: "/images/mechanical_keyboard_1780238028029.png",
     category: "Accessories",
-    tag: "New"
+    tag: "New",
+    description: "The Aftershock Oden is a premium TKL mechanical keyboard with Cherry MX switches, per-key RGB lighting, N-key rollover, and aluminium top plate for professional gamers and typists."
   },
   {
     id: "ac4",
-    name: "GameSir Wireless Bluetooth Controller",
-    code: "Code asmkb87-2020",
+    name: "GameSir T4 Cyclone Pro Controller",
+    code: "Code GAMESIR-T4-PRO",
     price: 59.00,
     rating: 4.8,
     image: "/images/gamesir_controller_1780238117003.png",
-    category: "Accessories"
+    category: "Accessories",
+    description: "GameSir T4 with Hall-effect joysticks (zero drift), 2.4GHz wireless (<5ms latency), 20-hour battery, adjustable triggers, and universal compatibility with PC, Android, iOS, and Nintendo Switch."
   },
   {
     id: "ac5",
-    name: "ASUS ROG Swift Gaming Monitor",
+    name: "ASUS ROG Swift 360Hz Gaming Monitor",
     code: "Code MON-ROG360",
     price: 599.00,
     rating: 5.0,
     image: "/images/rog_monitor_new.png",
     category: "Accessories",
-    tag: "Hot"
+    tag: "Hot",
+    description: "ASUS ROG Swift 24.5\" FHD 360Hz IPS gaming monitor with 1ms GTG response time, G-SYNC Ultimate, NVIDIA Reflex Latency Analyzer, and ROG OLED display for competitive esports gaming."
   },
   {
     id: "ac6",
-    name: "VR Console Immersion Headset",
+    name: "Meta Quest 3 VR Headset",
     code: "Code VR-CONSOLE",
     price: 399.00,
     rating: 4.9,
     image: "/images/deal-vr.png",
     category: "Accessories",
-    tag: "30% OFF"
+    tag: "30% OFF",
+    description: "The Meta Quest 3 delivers a stunning mixed reality experience with 4K+ display, 120Hz refresh rate, inside-out 6DoF tracking, and pancake lenses. Standalone VR with optional PC streaming via Air Link."
   }
 ];
