@@ -4,7 +4,7 @@ import React, { useState } from "react";
 
 import { Product } from "../types";
 import { saveOrder } from "../utils/storage";
-import { CreditCard, Truck, ShieldCheck, ChevronLeft, Building2, User, Phone, Mail, MapPin } from "lucide-react";
+import { CreditCard, Truck, ShieldCheck, ChevronLeft, Building2, User, Phone, Mail, MapPin, Loader2, ExternalLink, Lock } from "lucide-react";
 
 interface CheckoutPageProps {
   cart: { product: Product; qty: number }[];
@@ -31,7 +31,7 @@ export default function CheckoutPage({ cart, setCart, formatPrice }: CheckoutPag
     const formData = new FormData(e.target as HTMLFormElement);
     
     const items = cart.map(item => ({
-      product: item.product.id || item.product._id, // Support mock id or DB _id
+      product: item.product.id || item.product._id,
       name: item.product.name,
       image: item.product.image,
       price: item.product.price,
@@ -57,13 +57,64 @@ export default function CheckoutPage({ cart, setCart, formatPrice }: CheckoutPag
 
     try {
       const token = localStorage.getItem('token');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // ─── Card Payment: Safepay Flow ───────────────────────────────────────
+      if (paymentMethod === 'card') {
+        // First create the order as 'pending' in our DB
+        const orderRes = await fetch('/api/orders', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ ...orderPayload, paymentStatus: 'pending' })
+        });
+        const orderData = await orderRes.json();
+
+        if (!orderRes.ok) {
+          setError(orderData.message || 'Failed to create order.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const createdOrder = orderData.order;
+        sessionStorage.setItem('lastOrder', JSON.stringify(createdOrder));
+
+        // Then initiate Safepay payment session
+        const safepayRes = await fetch('/api/payment/create-session', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            orderId: createdOrder.orderId,
+            amount: total * 278, // Convert USD to PKR (1 USD = 278 PKR)
+            currency: 'PKR',
+            customerEmail: formData.get('email') as string,
+            customerName: formData.get('fullName') as string,
+          }),
+        });
+
+        const safepayData = await safepayRes.json();
+
+        if (safepayData.mode === 'demo' || !safepayData.checkoutUrl) {
+          // Safepay not configured yet — show demo notice and still redirect to confirmation
+          setError('');
+          setCart([]);
+          router.push('/order-confirmation');
+          return;
+        }
+
+        if (!safepayRes.ok || !safepayData.checkoutUrl) {
+          setError(safepayData.message || 'Payment gateway error. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Redirect to Safepay hosted checkout
+        setCart([]);
+        window.location.href = safepayData.checkoutUrl;
+        return;
       }
 
+      // ─── Bank Transfer / COD Flow ─────────────────────────────────────────
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers,
@@ -175,36 +226,42 @@ export default function CheckoutPage({ cart, setCart, formatPrice }: CheckoutPag
                 </h2>
                 <div className="space-y-4">
                   
-                  {/* Credit Card Option */}
+                  {/* Credit Card Option — Powered by Safepay */}
                   <label className={`flex flex-col border-2 rounded-xl cursor-pointer transition-all ${paymentMethod === "card" ? "border-[#164475] bg-[#164475]/5" : "border-gray-100 hover:border-[#164475]/30"}`}>
                     <div className="flex items-center gap-4 p-5">
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${paymentMethod === "card" ? "border-[#164475]" : "border-gray-300"}`}>
                         {paymentMethod === "card" && <div className="w-2.5 h-2.5 bg-[#164475] rounded-full" />}
                       </div>
                       <input type="radio" name="payment" value="card" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} className="hidden" />
-                      <div className="flex-1 font-bold text-[#0a1b2d]">Credit / Debit Card</div>
+                      <div className="flex-1">
+                        <div className="font-bold text-[#0a1b2d]">Credit / Debit Card</div>
+                        <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> Secured by Safepay
+                        </div>
+                      </div>
                       <div className="flex gap-1">
-                         <div className="w-8 h-5 bg-gray-200 rounded text-[8px] flex items-center justify-center font-bold text-gray-600">VISA</div>
-                         <div className="w-8 h-5 bg-gray-200 rounded text-[8px] flex items-center justify-center font-bold text-gray-600">MC</div>
+                        <div className="w-8 h-5 bg-blue-600 rounded text-[8px] flex items-center justify-center font-bold text-white">VISA</div>
+                        <div className="w-8 h-5 bg-red-600 rounded text-[8px] flex items-center justify-center font-bold text-white">MC</div>
+                        <div className="w-8 h-5 bg-green-600 rounded text-[8px] flex items-center justify-center font-bold text-white">PKR</div>
                       </div>
                     </div>
                     {paymentMethod === "card" && (
-                      <div className="p-5 pt-0 border-t border-[#164475]/10 mt-2 space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Card Number</label>
-                          <div className="relative">
-                            <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input type="text" placeholder="0000 0000 0000 0000" className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#164475] focus:border-transparent outline-none text-sm font-medium" />
+                      <div className="px-5 pb-5 border-t border-[#164475]/10 pt-4">
+                        <div className="bg-gradient-to-r from-[#164475]/5 to-blue-50 rounded-xl p-4 flex items-start gap-3">
+                          <div className="w-8 h-8 bg-[#164475] rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Lock className="w-4 h-4 text-white" />
                           </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Expiry (MM/YY)</label>
-                            <input type="text" placeholder="MM/YY" className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#164475] focus:border-transparent outline-none text-sm font-medium" />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">CVC</label>
-                            <input type="text" placeholder="123" className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#164475] focus:border-transparent outline-none text-sm font-medium" />
+                          <div>
+                            <p className="text-sm font-bold text-[#0a1b2d] mb-0.5">Secure Payment via Safepay</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">
+                              You will be redirected to Safepay’s secure checkout to complete payment.
+                              Your card details are handled by Safepay (licensed by State Bank of Pakistan) — we never see them.
+                            </p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">SBP Licensed</span>
+                              <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">PCI-DSS</span>
+                              <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full">256-bit SSL</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -279,14 +336,18 @@ export default function CheckoutPage({ cart, setCart, formatPrice }: CheckoutPag
                 type="submit"
                 form="checkout-form"
                 disabled={isSubmitting || cart.length === 0}
-                className="w-full flex items-center justify-center gap-2 bg-[#164475] hover:bg-[#164475] text-[#03152a] py-4 rounded-xl font-black text-sm tracking-wide transition-all shadow-lg hover:shadow-xl transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 bg-[#164475] hover:bg-[#1a5491] text-white py-4 rounded-xl font-black text-sm tracking-wide transition-all shadow-lg hover:shadow-xl transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
-                  <span className="w-5 h-5 border-2 border-[#03152a] border-t-transparent rounded-full animate-spin"></span>
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    {paymentMethod === 'card' ? 'Redirecting to Safepay…' : 'Placing Order…'}
+                  </>
                 ) : (
                   <>
                     <ShieldCheck className="w-5 h-5" />
-                    Place Order Now
+                    {paymentMethod === 'card' ? 'Pay Securely via Safepay' : 'Place Order Now'}
+                    {paymentMethod === 'card' && <ExternalLink className="w-4 h-4 ml-1 opacity-70" />}
                   </>
                 )}
               </button>

@@ -188,3 +188,65 @@ export let mockContactsMemory = [
     createdAt: new Date().toISOString()
   }
 ];
+
+export let mockBlogsMemory = [
+  {
+    _id: 'blog111111111111111111111',
+    id: 'blog111111111111111111111',
+    title: 'Top 5 Graphics Cards for Gaming in 2026',
+    slug: 'top-5-graphics-cards-for-gaming-in-2026',
+    content: 'Choosing the right graphics card is essential for any PC gamer. In this article, we look at the top 5 GPUs available today at Adamjee Computers. From NVIDIA RTX 5080 to AMD Radeon RX 8900, we cover pricing, benchmarks, and performance stats.',
+    author: 'Admin',
+    image: '',
+    category: 'Hardware',
+    excerpt: 'We review the top gaming GPUs for 2026.',
+    isPublished: true,
+    publishedAt: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
+    createdAt: new Date(Date.now() - 3600000 * 24 * 5).toISOString()
+  },
+  {
+    _id: 'blog222222222222222222222',
+    id: 'blog222222222222222222222',
+    title: 'Intel vs AMD: Which Processor is Right for You?',
+    slug: 'intel-vs-amd-which-processor-is-right-for-you',
+    content: 'The CPU war heats up! We break down the performance of the latest Intel Core Ultra 9 and AMD Ryzen 9 chips to help you decide which one to buy for gaming, streaming, or office productivity work.',
+    author: 'Admin',
+    image: '',
+    category: 'Guides',
+    excerpt: 'An in-depth processor comparison guide.',
+    isPublished: true,
+    publishedAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+    createdAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString()
+  }
+];
+
+export let mockDiscountsMemory = [
+  {
+    _id: 'disc111111111111111111111',
+    id: 'disc111111111111111111111',
+    code: 'WELCOME10',
+    type: 'percentage',
+    value: 10,
+    minRequirement: 100,
+    usageLimit: 50,
+    usageCount: 15,
+    startsAt: new Date(Date.now() - 3600000 * 24 * 30).toISOString(),
+    endsAt: null,
+    isActive: true,
+    createdAt: new Date(Date.now() - 3600000 * 24 * 30).toISOString()
+  },
+  {
+    _id: 'disc222222222222222222222',
+    id: 'disc222222222222222222222',
+    code: 'FREESHIP',
+    type: 'free_shipping',
+    value: 0,
+    minRequirement: 500,
+    usageLimit: null,
+    usageCount: 8,
+    startsAt: new Date(Date.now() - 3600000 * 24 * 10).toISOString(),
+    endsAt: null,
+    isActive: true,
+    createdAt: new Date(Date.now() - 3600000 * 24 * 10).toISOString()
+  }
+];

@@ -1,26 +1,53 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+
+const STATIC_POSTS = [
+  {
+    id: "blog1",
+    title: "How to Build a Gaming PC",
+    tag: "GAMING PC",
+    date: "13 May 2026",
+    desc: "Building a gaming PC may seem complicated at first, but with the right components and planning, you can craft the perfect rig. Follow our comprehensive tutorial.",
+    image: "/images/blog_gaming_setup.png",
+    overlay: true,
+  },
+  {
+    id: "blog2",
+    title: "Best GPUs for Gaming in Pakistan",
+    tag: "GPUs",
+    date: "13 May 2026",
+    desc: "Choosing the right graphics card is one of the most important decisions for any gaming setup. Whether you play competitive esports titles or high-end AAA games...",
+    image: "/images/blog_gpu_card.png",
+    overlay: false,
+  }
+];
 
 export default function BlogSection() {
-  const posts = [
-    {
-      id: "blog1",
-      title: "How to Build a Gaming PC",
-      tag: "GAMING PC",
-      date: "13 May 2026",
-      desc: "Building a gaming PC may seem complicated at first, but with the right components and planning, you can craft the perfect rig. Follow our comprehensive tutorial.",
-      image: "/images/blog_gaming_setup.png",
-      overlay: true,
-    },
-    {
-      id: "blog2",
-      title: "Best GPUs for Gaming in Pakistan",
-      tag: "GPUs",
-      date: "13 May 2026",
-      desc: "Choosing the right graphics card is one of the most important decisions for any gaming setup. Whether you play competitive esports titles or high-end AAA games...",
-      image: "/images/blog_gpu_card.png",
-      overlay: false,
-    }
-  ];
+  const [posts, setPosts] = useState<any[]>(STATIC_POSTS);
+
+  useEffect(() => {
+    fetch('/api/blogs')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.blogs && data.blogs.length > 0) {
+          const formatted = data.blogs.slice(0, 2).map((b: any, idx: number) => ({
+            id: b._id || b.id,
+            title: b.title,
+            tag: b.category ? b.category.toUpperCase() : "TECH",
+            date: new Date(b.publishedAt || b.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+            desc: b.excerpt || (b.content.length > 150 ? b.content.substring(0, 150) + '...' : b.content),
+            image: b.image || (idx === 0 ? "/images/blog_gaming_setup.png" : "/images/blog_gpu_card.png"),
+            overlay: idx === 0,
+          }));
+          if (formatted.length === 1) {
+            setPosts([formatted[0], STATIC_POSTS[1]]);
+          } else {
+            setPosts(formatted);
+          }
+        }
+      })
+      .catch(err => console.error("Failed to fetch homepage blogs:", err));
+  }, []);
 
   return (
     <section className="px-4 md:px-12 py-12 font-sans bg-white">

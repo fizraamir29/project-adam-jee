@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 import { ArrowRight, Calendar, User } from 'lucide-react';
 
-const BLOG_POSTS = [
+const STATIC_POSTS = [
   {
     id: '1',
     title: 'The Ultimate Guide to Building Your First Custom PC in 2026',
@@ -43,6 +43,38 @@ const BLOG_POSTS = [
 ];
 
 export default function BlogListingPage() {
+  const [posts, setPosts] = useState<any[]>(STATIC_POSTS);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/blogs')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.blogs && data.blogs.length > 0) {
+          const formatted = data.blogs.map((b: any) => ({
+            id: b._id || b.id,
+            title: b.title,
+            excerpt: b.excerpt || (b.content.length > 150 ? b.content.substring(0, 150) + '...' : b.content),
+            image: b.image || 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=800&q=80',
+            category: b.category || 'Guides',
+            date: new Date(b.publishedAt || b.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+            author: b.author || 'Adamjee Team'
+          }));
+          setPosts(formatted);
+        }
+      })
+      .catch(err => console.error("Failed to fetch blog list:", err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="pt-32 pb-24 min-h-screen bg-[#fafbfc] flex justify-center items-center">
+        <div className="w-10 h-10 border-4 border-[#164475] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="pt-32 pb-24 min-h-screen bg-[#fafbfc]">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -53,52 +85,58 @@ export default function BlogListingPage() {
           </p>
         </div>
 
-        {/* Featured Post */}
-        <div className="mb-16">
-          <Link href={`/blog/${BLOG_POSTS[0].id}`} className="group relative block rounded-3xl overflow-hidden bg-white border border-[#e2e8f0] shadow-sm hover:shadow-xl transition-all h-[500px]">
-            <img src={BLOG_POSTS[0].image} alt={BLOG_POSTS[0].title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-            <div className="absolute bottom-0 left-0 p-8 md:p-12 text-white w-full md:w-2/3">
-              <span className="inline-block bg-[#164475] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-4">
-                {BLOG_POSTS[0].category}
-              </span>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight group-hover:text-[#164475] transition-colors">{BLOG_POSTS[0].title}</h2>
-              <p className="text-gray-200 mb-6 line-clamp-2">{BLOG_POSTS[0].excerpt}</p>
-              <div className="flex items-center gap-6 text-sm text-gray-300">
-                <span className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {BLOG_POSTS[0].date}</span>
-                <span className="flex items-center gap-2"><User className="w-4 h-4" /> {BLOG_POSTS[0].author}</span>
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        {/* Blog Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {BLOG_POSTS.slice(1).map(post => (
-            <Link key={post.id} href={`/blog/${post.id}`} className="bg-white rounded-3xl border border-[#e2e8f0] shadow-sm hover:shadow-xl transition-all group overflow-hidden flex flex-col">
-              <div className="aspect-video relative overflow-hidden">
-                <img src={post.image} alt={post.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                <span className="absolute top-4 left-4 bg-white/90 backdrop-blur text-[#0a1b2d] text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">
-                  {post.category}
-                </span>
-              </div>
-              <div className="p-6 flex-1 flex flex-col">
-                <h3 className="text-xl font-bold text-[#0a1b2d] mb-3 group-hover:text-[#164475] transition-colors line-clamp-2">
-                  {post.title}
-                </h3>
-                <p className="text-[#64748b] text-sm mb-6 line-clamp-3 flex-1">
-                  {post.excerpt}
-                </p>
-                <div className="flex items-center justify-between mt-auto pt-4 border-t border-[#e2e8f0]">
-                  <span className="text-xs text-[#64748b] font-semibold">{post.date}</span>
-                  <span className="flex items-center gap-1 text-[#164475] text-sm font-bold group-hover:gap-2 transition-all">
-                    Read More <ArrowRight className="w-4 h-4" />
+        {posts.length > 0 && (
+          <>
+            {/* Featured Post */}
+            <div className="mb-16">
+              <Link href={`/blog/${posts[0].id}`} className="group relative block rounded-3xl overflow-hidden bg-white border border-[#e2e8f0] shadow-sm hover:shadow-xl transition-all h-[500px]">
+                <img src={posts[0].image} alt={posts[0].title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+                <div className="absolute bottom-0 left-0 p-8 md:p-12 text-white w-full md:w-2/3">
+                  <span className="inline-block bg-[#164475] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-4">
+                    {posts[0].category}
                   </span>
+                  <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight group-hover:text-[#164475] transition-colors">{posts[0].title}</h2>
+                  <p className="text-gray-200 mb-6 line-clamp-2">{posts[0].excerpt}</p>
+                  <div className="flex items-center gap-6 text-sm text-gray-300">
+                    <span className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {posts[0].date}</span>
+                    <span className="flex items-center gap-2"><User className="w-4 h-4" /> {posts[0].author}</span>
+                  </div>
                 </div>
+              </Link>
+            </div>
+
+            {/* Blog Grid */}
+            {posts.length > 1 && (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {posts.slice(1).map(post => (
+                  <Link key={post.id} href={`/blog/${post.id}`} className="bg-white rounded-3xl border border-[#e2e8f0] shadow-sm hover:shadow-xl transition-all group overflow-hidden flex flex-col">
+                    <div className="aspect-video relative overflow-hidden">
+                      <img src={post.image} alt={post.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <span className="absolute top-4 left-4 bg-white/90 backdrop-blur text-[#0a1b2d] text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">
+                        {post.category}
+                      </span>
+                    </div>
+                    <div className="p-6 flex-1 flex flex-col">
+                      <h3 className="text-xl font-bold text-[#0a1b2d] mb-3 group-hover:text-[#164475] transition-colors line-clamp-2">
+                        {post.title}
+                      </h3>
+                      <p className="text-[#64748b] text-sm mb-6 line-clamp-3 flex-1">
+                        {post.excerpt}
+                      </p>
+                      <div className="flex items-center justify-between mt-auto pt-4 border-t border-[#e2e8f0]">
+                        <span className="text-xs text-[#64748b] font-semibold">{post.date}</span>
+                        <span className="flex items-center gap-1 text-[#164475] text-sm font-bold group-hover:gap-2 transition-all">
+                          Read More <ArrowRight className="w-4 h-4" />
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            </Link>
-          ))}
-        </div>
+            )}
+          </>
+        )}
         
         <div className="text-center mt-12">
           <button className="border-2 border-[#cbd5e1] text-[#0a1b2d] hover:border-[#164475] hover:text-[#164475] font-bold px-8 py-3 rounded-full transition-colors">

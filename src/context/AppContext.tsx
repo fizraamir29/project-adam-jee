@@ -34,6 +34,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Sync products from API to localStorage for real-time storefront updates
+  useEffect(() => {
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.products) {
+          localStorage.setItem('adamjee_products', JSON.stringify(data.products));
+        }
+      })
+      .catch(err => console.error('Failed to sync products from API:', err));
+  }, []);
+
   // Save cart to localStorage
   useEffect(() => {
     if (cart.length > 0) {
