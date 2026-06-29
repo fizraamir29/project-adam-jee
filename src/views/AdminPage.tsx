@@ -774,15 +774,6 @@ export default function AdminPage() {
   const { paged: pagedInvoices, page: invoicesPage, setPage: setInvoicesPage, totalPages: invoicesTotalPages } = usePagination(invoices, 10);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
-    if (token && userStr) {
-      const user = JSON.parse(userStr);
-      if (user.role === 'admin') {
-        setIsAuthenticated(true);
-        loadData(token);
-      }
-    }
     try {
       const log = JSON.parse(localStorage.getItem('inv_log') || '[]');
       setInventoryLog(log);
@@ -1180,14 +1171,14 @@ export default function AdminPage() {
             </div>
           </div>
           <h2 className="text-xl font-bold text-[#1a1a1a] mb-1 text-center">Adamjee Computers</h2>
-          <p className="text-xs text-[#5c5c5c] mb-6 text-center">Admin Portal — Login with your admin account</p>
+          <p className="text-xs text-[#5c5c5c] mb-6 text-center">Admin Portal — Use your admin credentials to login</p>
           {loginError && <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs font-bold rounded border border-red-100">{loginError}</div>}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-[#1a1a1a] mb-1.5">Email address</label>
               <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} required
                 className="w-full px-3 py-2 bg-white border border-[#cbd5e1] rounded text-sm focus:outline-none focus:border-[#164475]"
-                placeholder="admin@adamjee.com" />
+                placeholder="admin@admin.gmail.com" />
             </div>
             <div>
               <label className="block text-xs font-bold text-[#1a1a1a] mb-1.5">Password</label>
