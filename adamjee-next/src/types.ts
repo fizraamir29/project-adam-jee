@@ -4,12 +4,25 @@ export interface Product {
   name: string;
   code: string;
   price: number;
+  comparePrice?: number;
+  costPerItem?: number;
+  barcode?: string;
+  vendor?: string;
+  productType?: string;
+  trackQuantity?: boolean;
+  continueSellingOutOfStock?: boolean;
+  weight?: number;
+  weightUnit?: string;
+  chargeTax?: boolean;
   rating: number;
   image: string;
   tag?: string;
   category?: string;
   additionalImages?: string[];
   description?: string;
+  stock?: number;
+  isPublished?: boolean;
+  isFeatured?: boolean;
 }
 
 export interface PCComponent {

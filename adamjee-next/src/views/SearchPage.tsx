@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { getProducts, INITIAL_PRODUCTS } from '../utils/storage';
 import { Filter, ChevronDown, ShoppingCart } from 'lucide-react';
 
 
@@ -15,11 +14,19 @@ export default function SearchPage({ handleAddToCart, formatPrice }: SearchPageP
   const [priceRange, setPriceRange] = useState(5000);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('Featured');
-  
   const categories = ['All', 'Headphones', 'Earphones', 'Speakers', 'Accessories'];
-  const [allProducts, setAllProducts] = useState<Product[]>(() => INITIAL_PRODUCTS);
+  
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    setAllProducts(getProducts());
+    fetch('/api/products?limit=100')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.products) setAllProducts(data.products);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
   const filteredProducts = allProducts.filter(p => {
@@ -114,7 +121,11 @@ export default function SearchPage({ handleAddToCart, formatPrice }: SearchPageP
               </div>
             </div>
 
-            {filteredProducts.length > 0 ? (
+            {loading ? (
+              <div className="py-20 flex justify-center items-center">
+                <div className="w-10 h-10 border-4 border-[#164475] border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : filteredProducts.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProducts.map(product => (
                   <div key={product.id} className="bg-white rounded-3xl p-5 border border-[#e2e8f0] shadow-sm hover:shadow-xl transition-all group flex flex-col h-full">

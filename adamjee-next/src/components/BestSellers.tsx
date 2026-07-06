@@ -1,7 +1,8 @@
-import React from "react";
+'use client';
+
+import React, { useState, useEffect } from "react";
 import { Star } from "lucide-react";
 import { Product } from "../types";
-import { BUNDLE_PRODUCTS } from "../data";
 
 interface BestSellersProps {
   bundle: Product[];
@@ -23,7 +24,20 @@ export default function BestSellers({
     return bundle.length >= 3 ? subtotal * 0.7 : subtotal;
   };
 
-  const bundleProducts = BUNDLE_PRODUCTS.slice(0, 4);
+  const [bundleProducts, setBundleProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/products?featured=true&limit=4')
+      .then(res => res.json())
+      .then(data => {
+        if(data.success && data.products) {
+          setBundleProducts(data.products.slice(0, 4));
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   const bundleTotal = bundle.reduce((a, b) => a + b.price, 0);
   const discountedTotal = handleApplyBundleDiscount(bundleTotal);
@@ -56,8 +70,13 @@ export default function BestSellers({
           {/* Left Column product grid — scrollable */}
           <div className="lg:col-span-2 reveal-left">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {bundleProducts.map(prod => {
-              const inBundle = bundle.find(b => b.id === prod.id);
+          {loading && (
+            <div className="col-span-full py-12 flex justify-center items-center">
+              <div className="w-10 h-10 border-4 border-[#164475] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
+          {!loading && bundleProducts.map(prod => {
+              const inBundle = bundle.find(b => b.id === prod.id || b._id === prod._id);
               return (
                 <div key={prod.id} className="bg-[#f8f9fa] rounded-[20px] flex flex-col justify-between p-4 card-hover">
                   {/* Image Area */}

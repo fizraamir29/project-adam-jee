@@ -9,6 +9,7 @@ import Header from '@/components/Header';
 import CartOverlay from '@/components/CartOverlay';
 import UnifiedFooter from '@/components/UnifiedFooter';
 import AIChatbot from '@/components/AIChatbot';
+import AdminChatbot from '@/components/AdminChatbot';
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -41,7 +42,11 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
 
       {!isAdminRoute && <UnifiedFooter setIsBuilderOpen={() => {}} />}
 
-      <AIChatbot />
+      {/* Customer chatbot — public pages only */}
+      {!isAdminRoute && <AIChatbot />}
+
+      {/* Admin chatbot — admin panel only */}
+      {isAdminRoute && <AdminChatbot />}
     </div>
   );
 }

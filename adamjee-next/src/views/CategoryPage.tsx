@@ -3,7 +3,6 @@ import { useParams } from 'next/navigation';
 import React, { useState, useEffect, useRef } from "react";
 
 import { Product } from "../types";
-import { getProducts, INITIAL_PRODUCTS } from "../utils/storage";
 import { Filter, X, Star, ChevronDown, ChevronRight, ArrowRight } from "lucide-react";
 
 interface CategoryPageProps {
@@ -25,22 +24,66 @@ export default function CategoryPage({ handleAddToCart, formatPrice }: CategoryP
   const [sortBy, setSortBy] = useState("Featured");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [stickyVisible, setStickyVisible] = useState(false);
+  const [sidebarCategory, setSidebarCategory] = useState("All Products");
+  const [sidebarPrice, setSidebarPrice] = useState<string | null>(null);
+  const [sidebarBrand, setSidebarBrand] = useState<string | null>(null);
+  const [sidebarAvailability, setSidebarAvailability] = useState<string | null>(null);
+
   const heroRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Products data filtered and sorted dynamically
   const soldOutIds = ["hp3", "ac6"];
 
-  const [productsList, setProductsList] = useState<Product[]>(() => INITIAL_PRODUCTS);
+  const [productsList, setProductsList] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    setProductsList(getProducts());
+    fetch('/api/products?limit=100')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.products) {
+          setProductsList(data.products);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
   const TABS = getTabsData(productsList);
 
   const filteredProducts = productsList.filter(product => {
-    if (activeTab === "All") return true;
-    return product.category === activeTab;
+    // Top Tabs
+    if (activeTab !== "All" && product.category !== activeTab) return false;
+    
+    // Sidebar Categories
+    if (sidebarCategory !== "All Products") {
+      if (product.category !== sidebarCategory) return false;
+    }
+    
+    // Price
+    if (sidebarPrice) {
+      if (sidebarPrice === "Under $50" && product.price >= 50) return false;
+      if (sidebarPrice === "$50 — $200" && (product.price < 50 || product.price > 200)) return false;
+      if (sidebarPrice === "$200 — $500" && (product.price < 200 || product.price > 500)) return false;
+      if (sidebarPrice === "$500 — $1,000" && (product.price < 500 || product.price > 1000)) return false;
+      if (sidebarPrice === "Over $1,000" && product.price <= 1000) return false;
+    }
+    
+    // Brands
+    if (sidebarBrand) {
+      const brandWord = sidebarBrand.split(' ')[0].toLowerCase();
+      if (!product.name.toLowerCase().includes(brandWord)) return false;
+    }
+    
+    // Availability
+    if (sidebarAvailability) {
+      const isStock = (product as any).stock !== undefined ? (product as any).stock > 0 : true; // assume in stock if undefined
+      if (sidebarAvailability === "In Stock" && !isStock) return false;
+      if (sidebarAvailability === "Out of Stock" && isStock) return false;
+    }
+    
+    return true;
   });
 
   const products = [...filteredProducts].sort((a, b) => {
@@ -226,7 +269,12 @@ export default function CategoryPage({ handleAddToCart, formatPrice }: CategoryP
           ref={gridRef}
           className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5"
         >
-          {products.map((product, idx) => {
+          {loading && (
+            <div className="col-span-full py-20 flex justify-center items-center">
+              <div className="w-10 h-10 border-4 border-[#164475] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
+          {!loading && products.map((product, idx) => {
             const isSoldOut = soldOutIds.includes(product.id);
 
             return (
@@ -411,9 +459,9 @@ export default function CategoryPage({ handleAddToCart, formatPrice }: CategoryP
                 <h4 className="font-black text-[#0a1b2d] uppercase text-xs tracking-widest border-b pb-3">Categories</h4>
                 <div className="space-y-3">
                   {["All Products", "Desktops", "Laptops", "Components", "Monitors", "Accessories"].map((cat) => (
-                    <label key={cat} className="flex items-center gap-3 cursor-pointer group">
-                      <div className="w-5 h-5 rounded-md border-2 border-gray-300 group-hover:border-[#164475] transition-colors flex items-center justify-center">
-                        {cat === "All Products" && (
+                    <label key={cat} className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setSidebarCategory(cat); }}>
+                      <div className={`w-5 h-5 rounded-md border-2 transition-colors flex items-center justify-center ${cat === sidebarCategory ? 'border-[#164475]' : 'border-gray-300 group-hover:border-[#164475]'}`}>
+                        {cat === sidebarCategory && (
                           <div className="w-3 h-3 bg-[#164475] rounded-sm" />
                         )}
                       </div>
@@ -428,8 +476,10 @@ export default function CategoryPage({ handleAddToCart, formatPrice }: CategoryP
                 <h4 className="font-black text-[#0a1b2d] uppercase text-xs tracking-widest border-b pb-3">Price Range</h4>
                 <div className="space-y-3">
                   {["Under $50", "$50 — $200", "$200 — $500", "$500 — $1,000", "Over $1,000"].map((price) => (
-                    <label key={price} className="flex items-center gap-3 cursor-pointer group">
-                      <div className="w-5 h-5 rounded-md border-2 border-gray-300 group-hover:border-[#164475] transition-colors" />
+                    <label key={price} className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setSidebarPrice(price === sidebarPrice ? null : price); }}>
+                      <div className={`w-5 h-5 rounded-md border-2 transition-colors flex items-center justify-center ${price === sidebarPrice ? 'border-[#164475]' : 'border-gray-300 group-hover:border-[#164475]'}`}>
+                        {price === sidebarPrice && <div className="w-3 h-3 bg-[#164475] rounded-sm" />}
+                      </div>
                       <span className="text-sm text-gray-600 group-hover:text-[#0a1b2d] font-medium transition-colors">{price}</span>
                     </label>
                   ))}
@@ -441,8 +491,10 @@ export default function CategoryPage({ handleAddToCart, formatPrice }: CategoryP
                 <h4 className="font-black text-[#0a1b2d] uppercase text-xs tracking-widest border-b pb-3">Brands</h4>
                 <div className="space-y-3">
                   {["ASUS ROG", "Corsair", "Razer", "MSI", "Logitech", "Dell", "HyperX"].map((brand) => (
-                    <label key={brand} className="flex items-center gap-3 cursor-pointer group">
-                      <div className="w-5 h-5 rounded-md border-2 border-gray-300 group-hover:border-[#164475] transition-colors" />
+                    <label key={brand} className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setSidebarBrand(brand === sidebarBrand ? null : brand); }}>
+                      <div className={`w-5 h-5 rounded-md border-2 transition-colors flex items-center justify-center ${brand === sidebarBrand ? 'border-[#164475]' : 'border-gray-300 group-hover:border-[#164475]'}`}>
+                        {brand === sidebarBrand && <div className="w-3 h-3 bg-[#164475] rounded-sm" />}
+                      </div>
                       <span className="text-sm text-gray-600 group-hover:text-[#0a1b2d] font-medium transition-colors">{brand}</span>
                     </label>
                   ))}
@@ -454,8 +506,10 @@ export default function CategoryPage({ handleAddToCart, formatPrice }: CategoryP
                 <h4 className="font-black text-[#0a1b2d] uppercase text-xs tracking-widest border-b pb-3">Availability</h4>
                 <div className="space-y-3">
                   {["In Stock", "Out of Stock"].map((status) => (
-                    <label key={status} className="flex items-center gap-3 cursor-pointer group">
-                      <div className="w-5 h-5 rounded-md border-2 border-gray-300 group-hover:border-[#164475] transition-colors" />
+                    <label key={status} className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setSidebarAvailability(status === sidebarAvailability ? null : status); }}>
+                      <div className={`w-5 h-5 rounded-md border-2 transition-colors flex items-center justify-center ${status === sidebarAvailability ? 'border-[#164475]' : 'border-gray-300 group-hover:border-[#164475]'}`}>
+                        {status === sidebarAvailability && <div className="w-3 h-3 bg-[#164475] rounded-sm" />}
+                      </div>
                       <span className="text-sm text-gray-600 group-hover:text-[#0a1b2d] font-medium transition-colors">{status}</span>
                     </label>
                   ))}
@@ -464,10 +518,21 @@ export default function CategoryPage({ handleAddToCart, formatPrice }: CategoryP
             </div>
 
             {/* Apply Button */}
-            <div className="p-6 border-t border-gray-100 bg-white sticky bottom-0">
+            <div className="p-6 border-t border-gray-100 bg-white sticky bottom-0 flex gap-3">
+              <button
+                onClick={() => {
+                  setSidebarCategory("All Products");
+                  setSidebarPrice(null);
+                  setSidebarBrand(null);
+                  setSidebarAvailability(null);
+                }}
+                className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-600 py-4 rounded-2xl font-bold transition-colors"
+              >
+                Clear
+              </button>
               <button
                 onClick={() => setFiltersOpen(false)}
-                className="w-full bg-[#0a1b2d] hover:bg-[#164475] text-white py-4 rounded-2xl font-bold transition-colors shadow-lg"
+                className="w-2/3 bg-[#0a1b2d] hover:bg-[#164475] text-white py-4 rounded-2xl font-bold transition-colors shadow-lg"
               >
                 Apply Filters
               </button>
