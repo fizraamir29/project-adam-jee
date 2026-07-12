@@ -543,7 +543,16 @@ const NAV_GROUPS: NavGroup[] = [
           { id: 'pages', label: 'Pages' }
         ]
       },
-      { id: 'analytics', icon: BarChart3, label: 'Analytics' },
+      {
+        id: 'analytics',
+        icon: BarChart3,
+        label: 'Analytics',
+        subItems: [
+          { id: 'analytics', label: 'Dashboard' },
+          { id: 'reports', label: 'Reports' },
+          { id: 'live-view', label: 'Live View' }
+        ]
+      },
       { id: 'discounts', icon: Percent, label: 'Discounts' }
     ]
   },
@@ -1087,7 +1096,7 @@ export default function AdminPage() {
     loadData(token!);
   };
 
-  /* ─── SHOPIFY-STYLE ORDER BUILDER ─────────────── */
+  /* ─── ADAMJEE ORDER BUILDER ─────────────── */
   const handleSaveCreateOrder = async (status: 'draft' | 'pending' | 'paid') => {
     if (!coCustomerName.trim()) { alert('Please enter customer name'); return; }
     if (coItems.length === 0 || coItems.some(i => !i.productId)) { alert('Please add products'); return; }
@@ -1195,37 +1204,167 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#f6f6f7] flex text-[#1a1a1a] font-sans antialiased">
-      {/* ─── ADAMJEE SIDEBAR ─── */}
-      <aside className="w-60 bg-[#ebebeb] border-r border-[#cbd5e1] flex flex-col fixed top-0 left-0 h-full z-40 select-none">
-        {/* Adamjee Brand Header */}
-        <div className="px-4 py-3 flex items-center justify-between border-b border-[#cbd5e1] bg-[#f3f3f3]">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-[#164475] rounded flex items-center justify-center text-white">
-              <ShoppingBag className="w-4 h-4" />
-            </div>
-            <span className="font-extrabold text-[#1a1a1a] text-sm tracking-tight flex items-center">
-              Adamjee
+      {/* ─── SHOPIFY-STYLE DARK TOP BAR ─── */}
+      <div className="fixed top-0 left-0 right-0 h-12 bg-[#1a1a1a] z-50 flex items-center px-4 gap-4">
+        {/* Logo */}
+        <div className="flex items-center gap-2 min-w-[200px]">
+          <div className="w-8 h-8 bg-[#164475] rounded-lg flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="white">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <span className="text-white font-bold text-sm tracking-tight">Adamjee Computers</span>
+        </div>
+
+        {/* Centered Search */}
+        <div className="flex-1 max-w-xl mx-auto">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8a8a8a]" />
+            <input
+              type="text"
+              value={topSearchQuery}
+              onChange={(e) => setTopSearchQuery(e.target.value)}
+              placeholder="Search"
+              className="w-full pl-10 pr-16 py-1.5 bg-[#303030] border border-[#505050] rounded-lg text-sm text-white placeholder-[#8a8a8a] focus:outline-none focus:border-[#707070] focus:bg-[#404040] transition-colors"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold bg-[#505050] text-[#b0b0b0] px-1.5 py-0.5 rounded">
+              CTRL K
             </span>
+            {/* Real-time Search Results Dropdown */}
+            {topSearchQuery.trim().length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-2xl border border-[#e0e0e0] max-h-80 overflow-y-auto z-[100]">
+                {(() => {
+                  const q = topSearchQuery.toLowerCase();
+                  const matchedProducts = products.filter(p => p.name?.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q));
+                  const matchedOrders = orders.filter(o => o.orderId?.toLowerCase().includes(q) || o.customer?.name?.toLowerCase().includes(q));
+                  const matchedTabs = ['home','orders','products','customers','analytics','discounts','settings','reports','live-view','invoices','inbox','online-store'].filter(t => t.includes(q));
+                  if (matchedProducts.length === 0 && matchedOrders.length === 0 && matchedTabs.length === 0) {
+                    return <div className="p-4 text-xs text-[#8a8a8a] text-center">No results found for "{topSearchQuery}"</div>;
+                  }
+                  return (
+                    <div className="divide-y divide-[#f0f0f0]">
+                      {matchedTabs.length > 0 && (
+                        <div className="p-2">
+                          <p className="px-2 py-1 text-[10px] font-bold text-[#8a8a8a] uppercase">Pages</p>
+                          {matchedTabs.slice(0,4).map(t => (
+                            <button key={t} onClick={() => { setActiveTab(t); setTopSearchQuery(''); }} className="w-full text-left px-3 py-2 text-xs font-semibold text-[#1a1a1a] hover:bg-[#f6f6f7] rounded flex items-center gap-2 capitalize">
+                              <Search className="w-3 h-3 text-[#8a8a8a]" /> {t.replace(/-/g,' ')}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {matchedProducts.length > 0 && (
+                        <div className="p-2">
+                          <p className="px-2 py-1 text-[10px] font-bold text-[#8a8a8a] uppercase">Products ({matchedProducts.length})</p>
+                          {matchedProducts.slice(0,5).map(p => (
+                            <button key={p._id} onClick={() => { setActiveTab('products-list'); setTopSearchQuery(''); }} className="w-full text-left px-3 py-2 text-xs font-semibold text-[#1a1a1a] hover:bg-[#f6f6f7] rounded flex items-center gap-2">
+                              <img src={p.image} alt="" className="w-6 h-6 rounded object-cover bg-[#f6f6f7]" /> {p.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {matchedOrders.length > 0 && (
+                        <div className="p-2">
+                          <p className="px-2 py-1 text-[10px] font-bold text-[#8a8a8a] uppercase">Orders ({matchedOrders.length})</p>
+                          {matchedOrders.slice(0,5).map(o => (
+                            <button key={o._id || o.orderId} onClick={() => { setActiveTab('orders-list'); setTopSearchQuery(''); }} className="w-full text-left px-3 py-2 text-xs font-semibold text-[#1a1a1a] hover:bg-[#f6f6f7] rounded flex items-center gap-2">
+                              <Package className="w-4 h-4 text-[#8a8a8a]" /> {o.orderId} — {o.customer?.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Store switch block */}
-        <div className="px-3 py-2">
-          <div className="flex items-center justify-between bg-white rounded border border-[#cbd5e1] px-2.5 py-1.5 cursor-pointer hover:bg-[#f6f6f7] transition-all">
-            <div className="min-w-0">
-              <p className="text-[11px] text-[#5c5c5c] font-semibold leading-none">Store</p>
-              <p className="text-xs font-bold text-[#1a1a1a] truncate leading-normal mt-0.5">Adamjee Computers</p>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-[#5c5c5c] flex-shrink-0" />
+        {/* Right Side: Notifications + Store */}
+        <div className="flex items-center gap-3 min-w-[200px] justify-end">
+          {/* Notifications Bell */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(p => !p)}
+              className="relative w-8 h-8 rounded-lg hover:bg-[#303030] flex items-center justify-center transition-colors"
+            >
+              <Bell className="w-4 h-4 text-[#b0b0b0]" />
+              {orders.filter(o => o.orderStatus === 'pending').length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                  {orders.filter(o => o.orderStatus === 'pending').length}
+                </span>
+              )}
+            </button>
+            {showNotifications && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-2xl border border-[#e0e0e0] z-[100] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[#f0f0f0] flex justify-between items-center">
+                  <h3 className="text-sm font-bold text-[#1a1a1a]">Notifications</h3>
+                  <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+                    {orders.filter(o => o.orderStatus === 'pending').length} new
+                  </span>
+                </div>
+                <div className="max-h-64 overflow-y-auto divide-y divide-[#f5f5f5]">
+                  {orders.filter(o => o.orderStatus === 'pending').length === 0 ? (
+                    <div className="p-6 text-center text-xs text-[#8a8a8a]">All caught up! No pending notifications.</div>
+                  ) : (
+                    orders.filter(o => o.orderStatus === 'pending').slice(0, 8).map(o => (
+                      <div key={o._id || o.orderId} className="px-4 py-3 hover:bg-[#f9f9f9] cursor-pointer flex items-start gap-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Package className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#1a1a1a] truncate">New order {o.orderId}</p>
+                          <p className="text-[10px] text-[#8a8a8a]">from {o.customer?.name || 'Customer'} · PKR {o.total?.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Store Profile */}
+          <div className="relative">
+            <button
+              onClick={() => setShowStoreDropdown(p => !p)}
+              className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-[#303030] transition-colors cursor-pointer"
+            >
+              <div className="w-7 h-7 rounded-full bg-[#164475] text-white font-bold text-[10px] flex items-center justify-center">AC</div>
+              <span className="text-xs font-semibold text-white hidden md:block">Adamjee Store</span>
+            </button>
+            {showStoreDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-2xl border border-[#e0e0e0] z-[100] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[#f0f0f0]">
+                  <p className="text-xs font-bold text-[#1a1a1a]">Adamjee Computers</p>
+                  <p className="text-[10px] text-[#8a8a8a]">adamjeecomputers.pk</p>
+                </div>
+                <div className="p-1">
+                  <button onClick={() => { setActiveTab('settings'); setShowStoreDropdown(false); }} className="w-full text-left px-3 py-2 text-xs font-semibold text-[#1a1a1a] hover:bg-[#f6f6f7] rounded flex items-center gap-2">
+                    <Settings className="w-3.5 h-3.5" /> Store Settings
+                  </button>
+                  <button onClick={() => { setActiveTab('online-store'); setShowStoreDropdown(false); }} className="w-full text-left px-3 py-2 text-xs font-semibold text-[#1a1a1a] hover:bg-[#f6f6f7] rounded flex items-center gap-2">
+                    <Globe className="w-3.5 h-3.5" /> View Online Store
+                  </button>
+                  <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded flex items-center gap-2">
+                    <LogOut className="w-3.5 h-3.5" /> Log Out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      </div>
 
+      {/* ─── ADAMJEE SIDEBAR ─── */}
+      <aside className="w-60 bg-[#f3f3f3] border-r border-[#e0e0e0] flex flex-col fixed top-12 left-0 h-[calc(100%-48px)] z-40 select-none">
         {/* Navigation list */}
-        <nav className="flex-1 px-2 py-2 overflow-y-auto space-y-3">
+        <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-3">
           {NAV_GROUPS.map((group, gIdx) => (
-            <div key={gIdx} className="space-y-1">
+            <div key={gIdx} className="space-y-0.5">
               {group.title && (
-                <p className="px-3 text-[10px] font-bold text-[#5c5c5c] uppercase tracking-wider mb-1">{group.title}</p>
+                <p className="px-3 pt-2 pb-1 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider">{group.title}</p>
               )}
               {group.items.map(item => {
                 const isActive = activeTab === item.id || 
@@ -1242,17 +1381,17 @@ export default function AdminPage() {
                         setActiveTab(item.subItems ? item.subItems[0].id : item.id);
                         setShowCreateOrderView(false);
                       }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded text-xs font-bold transition-all text-left ${
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-left ${
                         isActive 
-                          ? 'bg-white text-[#1a1a1a] border-l-4 border-[#164475] shadow-sm font-black' 
-                          : 'text-[#5c5c5c] hover:bg-[#cbd5e1]/40 hover:text-[#1a1a1a]'
+                          ? 'bg-[#e4e4e4] text-[#1a1a1a] font-bold' 
+                          : 'text-[#616161] hover:bg-[#e8e8e8] hover:text-[#1a1a1a]'
                       }`}
                     >
                       <item.icon className="w-4 h-4 flex-shrink-0 text-inherit" />
                       <span className="flex-1">{item.label}</span>
                       
                       {item.id === 'orders' && orders.filter(o => o.orderStatus === 'pending' || o.orderStatus === 'processing').length > 0 && (
-                        <span className="bg-[#164475] text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full">
+                        <span className="bg-[#164475] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
                           {orders.filter(o => o.orderStatus === 'pending' || o.orderStatus === 'processing').length}
                         </span>
                       )}
@@ -1270,10 +1409,10 @@ export default function AdminPage() {
                               setActiveTab(sub.id);
                               setShowCreateOrderView(false);
                             }}
-                            className={`w-full text-left px-3 py-1 rounded text-xs font-semibold ${
+                            className={`w-full text-left px-3 py-1 rounded text-xs ${
                               activeTab === sub.id
-                                ? 'text-[#1a1a1a] font-bold bg-[#cbd5e1]/50'
-                                : 'text-[#5c5c5c] hover:text-[#1a1a1a] hover:bg-[#cbd5e1]/20'
+                                ? 'text-[#1a1a1a] font-bold'
+                                : 'text-[#616161] hover:text-[#1a1a1a] font-medium'
                             }`}
                           >
                             {sub.label}
@@ -1289,49 +1428,16 @@ export default function AdminPage() {
         </nav>
 
         {/* Bottom Menu Items */}
-        <div className="p-2 border-t border-[#cbd5e1] space-y-1 bg-[#f3f3f3]">
+        <div className="p-2 border-t border-[#e0e0e0] space-y-0.5">
           <button onClick={() => { setActiveTab('settings'); setShowCreateOrderView(false); }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded text-xs font-bold ${
-              activeTab === 'settings' ? 'bg-white text-[#1a1a1a]' : 'text-[#5c5c5c] hover:bg-[#cbd5e1]/40'
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold ${
+              activeTab === 'settings' ? 'bg-[#e4e4e4] text-[#1a1a1a] font-bold' : 'text-[#616161] hover:bg-[#e8e8e8]'
             }`}>
             <Settings className="w-4 h-4" /> Settings
-          </button>
-          <button onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded text-xs font-bold text-[#5c5c5c] hover:bg-[#cbd5e1]/40 hover:text-red-600">
-            <LogOut className="w-4 h-4" /> Logout
           </button>
         </div>
       </aside>
 
-      {/* ─── SHOPIFY PAGE CONTAINER ─── */}
-      <div className="flex-1 ml-60 flex flex-col min-h-screen">
-        {/* Top Header */}
-        <header className="bg-white h-12 border-b border-[#ebebeb] flex items-center justify-between px-6 sticky top-0 z-30">
-          {/* Centered Search Bar */}
-          <div className="flex-1 flex justify-center max-w-xl">
-            <div className="relative w-full">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5c5c5c]" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full pl-9 pr-12 py-1 bg-[#f1f1f1] border border-[#cbd5e1] rounded text-xs focus:outline-none focus:bg-white focus:border-[#164475]"
-              />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold bg-[#cbd5e1]/50 text-[#5c5c5c] px-1 py-0.5 rounded border border-[#cbd5e1]">
-                ⌘K
-              </span>
-            </div>
-          </div>
-
-          {/* User profile & Info */}
-          <div className="flex items-center gap-4">
-            <button className="relative w-8 h-8 rounded hover:bg-[#f6f6f7] flex items-center justify-center">
-              <Bell className="w-4 h-4 text-[#5c5c5c]" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
-
-            <div className="flex items-center gap-2 cursor-pointer border-l border-[#cbd5e1] pl-4">
-              <div className="w-7 h-7 rounded-full bg-[#164475] text-white font-bold text-xs flex items-center justify-center shadow-inner">
-                AC
               </div>
               <div className="text-left hidden md:block">
                 <p className="text-[11px] font-bold text-[#1a1a1a] leading-none">Adamjee Admin</p>
@@ -1642,7 +1748,7 @@ export default function AdminPage() {
               {/* ═══ ORDERS TABS ═══ */}
               {(activeTab === 'orders-list' || activeTab === 'drafts' || activeTab === 'abandoned-checkouts') && (
                 <div className="space-y-4">
-                  {/* Shopify page header */}
+                  {/* Adamjee page header */}
                   <div className="flex justify-between items-center">
                     <h1 className="text-xl font-bold capitalize">
                       {activeTab === 'orders-list' ? 'Orders' : activeTab === 'drafts' ? 'Drafts' : 'Abandoned checkouts'}
@@ -1667,7 +1773,7 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Shopify Filters Tab Header */}
+                  {/* Adamjee Filters Tab Header */}
                   <div className="bg-white rounded-lg border border-[#ebebeb] shadow-sm overflow-hidden">
                     {activeTab === 'orders-list' && (
                       <div className="flex border-b border-[#ebebeb] overflow-x-auto">
@@ -2502,31 +2608,217 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* ═══ REPORTS APP TAB ═══ */}
-              {activeTab === 'reports' && (
-                <div className="bg-white rounded-lg border border-[#cbd5e1] p-6 shadow-sm space-y-4">
-                  <div className="flex justify-between items-center border-b pb-2">
-                    <h2 className="text-base font-bold">Store Reports Manager</h2>
-                    <button onClick={() => window.print()} className="px-3 py-1 bg-[#164475] text-white rounded text-xs font-semibold hover:bg-[#10355c]">Print PDF Summary</button>
+              {/* ═══ REPORTS TAB ═══ */}
+              {activeTab === 'reports' && (() => {
+                const allReports = [
+                  { name: 'Sessions by location', category: 'Acquisition', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Sessions by referrer', category: 'Acquisition', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Sessions over time', category: 'Acquisition', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Visitors over time', category: 'Acquisition', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Bounce rate over time', category: 'Behavior', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Checkout conversion rate', category: 'Behavior', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Conversion rate breakdown', category: 'Behavior', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Customer behavior', category: 'Behavior', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Search conversions over time', category: 'Behavior', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Sessions by device type', category: 'Behavior', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Customer cohort analysis', category: 'Customers', lastViewed: 'Today', creator: 'Adamjee' },
+                  { name: 'Customers by location', category: 'Customers', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'New customers over time', category: 'Customers', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'New vs returning customers', category: 'Customers', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Returning customer rate over time', category: 'Customers', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Chargeback rate', category: 'Finances', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Finance Summary', category: 'Finances', lastViewed: 'Yesterday', creator: 'Adamjee' },
+                  { name: 'Gross profit breakdown', category: 'Finances', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Gross sales by order', category: 'Finances', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Net payments by gateway', category: 'Finances', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Net sales by order', category: 'Finances', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Average order value over time', category: 'Sales', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Sales by category', category: 'Sales', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Sales by product', category: 'Sales', lastViewed: 'Today', creator: 'Adamjee' },
+                  { name: 'Total sales breakdown', category: 'Sales', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Total sales over time', category: 'Sales', lastViewed: 'Today', creator: 'Adamjee' },
+                  { name: 'Best selling products', category: 'Products', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Low inventory items', category: 'Products', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Product views over time', category: 'Products', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'ABC analysis by product', category: 'Inventory', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Days of inventory remaining', category: 'Inventory', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Month-end inventory value', category: 'Inventory', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Percent of inventory sold', category: 'Inventory', lastViewed: '--', creator: 'Adamjee' },
+                  { name: 'Custom data export', category: 'Custom', lastViewed: '--', creator: 'Custom' },
+                ];
+                const [rSearch, setRSearch] = React.useState('');
+                const [rCreator, setRCreator] = React.useState('All');
+                const [rCategory, setRCategory] = React.useState('All');
+                const [rPage, setRPage] = React.useState(1);
+                const pageSize = 12;
+                const categories = ['All', ...Array.from(new Set(allReports.map(r => r.category)))];
+                const filtered = allReports.filter(r =>
+                  (rCreator === 'All' || r.creator === rCreator) &&
+                  (rCategory === 'All' || r.category === rCategory) &&
+                  (rSearch === '' || r.name.toLowerCase().includes(rSearch.toLowerCase()))
+                );
+                const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+                const paged = filtered.slice((rPage - 1) * pageSize, rPage * pageSize);
+                return (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h1 className="text-xl font-bold">Reports</h1>
+                      <button onClick={() => exportCSV(allReports, 'reports.csv', [{key:'name',label:'Name'},{key:'category',label:'Category'},{key:'creator',label:'Creator'}])}
+                        className="px-3 py-1.5 bg-[#164475] text-white rounded text-xs font-semibold hover:bg-[#10355c]">Export CSV</button>
+                    </div>
+                    <div className="bg-white rounded-xl border border-[#cbd5e1] shadow-sm overflow-hidden">
+                      <div className="p-4 border-b border-[#ebebeb] flex flex-wrap gap-3 items-center">
+                        <div className="relative flex-1 min-w-[200px]">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#5c5c5c]" />
+                          <input value={rSearch} onChange={e => { setRSearch(e.target.value); setRPage(1); }} placeholder="Search reports..."
+                            className="w-full pl-8 pr-3 py-1.5 border border-[#cbd5e1] rounded text-xs focus:outline-none focus:border-[#164475]" />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase">Created by:</span>
+                          <select value={rCreator} onChange={e => { setRCreator(e.target.value); setRPage(1); }}
+                            className="border border-[#cbd5e1] rounded-lg bg-white px-2 py-1 text-xs outline-none cursor-pointer">
+                            <option value="All">All creators</option>
+                            <option value="Adamjee">Adamjee</option>
+                            <option value="Custom">Custom</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase">Category:</span>
+                          <select value={rCategory} onChange={e => { setRCategory(e.target.value); setRPage(1); }}
+                            className="border border-[#cbd5e1] rounded-lg bg-white px-2 py-1 text-xs outline-none cursor-pointer">
+                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead className="bg-[#fafafa] border-b border-[#cbd5e1] text-gray-500 font-bold">
+                            <tr>
+                              <th className="px-5 py-3">Name</th>
+                              <th className="px-5 py-3">Category</th>
+                              <th className="px-5 py-3">Last viewed</th>
+                              <th className="px-5 py-3">Created by</th>
+                              <th className="px-5 py-3 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#ebebeb] text-[#1a1a1a]">
+                            {paged.length === 0 ? (
+                              <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400">No reports match your filters.</td></tr>
+                            ) : paged.map((r, i) => (
+                              <tr key={i} className="hover:bg-[#f6f6f7] cursor-pointer">
+                                <td className="px-5 py-3 font-semibold text-[#164475]">{r.name}</td>
+                                <td className="px-5 py-3 text-[#5c5c5c]">{r.category}</td>
+                                <td className="px-5 py-3 text-[#5c5c5c]">{r.lastViewed}</td>
+                                <td className="px-5 py-3"><span className="bg-[#f0f7ff] text-[#164475] text-[10px] font-bold px-2 py-0.5 rounded-full">{r.creator}</span></td>
+                                <td className="px-5 py-3 text-right"><button className="text-[#164475] hover:underline text-[10px] font-bold">View</button></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between px-5 py-3 border-t border-[#ebebeb]">
+                          <span className="text-xs text-[#5c5c5c] font-semibold">{filtered.length} reports</span>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => setRPage(Math.max(1, rPage - 1))} disabled={rPage === 1} className="w-8 h-8 flex items-center justify-center rounded border border-[#cbd5e1] disabled:opacity-40 hover:bg-[#f6f6f7]"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                            <span className="text-xs font-bold px-2">{rPage}/{totalPages}</span>
+                            <button onClick={() => setRPage(Math.min(totalPages, rPage + 1))} disabled={rPage === totalPages} className="w-8 h-8 flex items-center justify-center rounded border border-[#cbd5e1] disabled:opacity-40 hover:bg-[#f6f6f7]"><ChevronRight className="w-3.5 h-3.5" /></button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-3 font-semibold text-[#1a1a1a]">
-                    <div className="p-4 border rounded bg-gray-50 space-y-2">
-                      <h4 className="font-bold text-[#164475]">Financial Report</h4>
-                      <p className="text-[#5c5c5c]">Review margins, sales, cost of goods, and total net profits across physical invoice records.</p>
-                      <button onClick={() => exportCSV(invoices, 'financials.csv', [{key:'invoiceId', label:'Invoice'}, {key:'customerName', label:'Customer'}, {key:'total', label:'Total'}])} className="text-xs text-[#164475] hover:underline font-bold">Export Excel →</button>
+                );
+              })()}
+              {/* ═══ LIVE VIEW TAB ═══ */}
+              {activeTab === 'live-view' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h1 className="text-xl font-bold">Live View</h1>
+                      <p className="text-xs text-[#5c5c5c] mt-0.5">Real-time store activity</p>
                     </div>
-
-                    <div className="p-4 border rounded bg-gray-50 space-y-2">
-                      <h4 className="font-bold text-[#164475]">Inventory Value Summary</h4>
-                      <p className="text-[#5c5c5c]">Check live cost holdings, wholesale margins, items tags, and categories counts in real-time.</p>
-                      <button onClick={() => exportCSV(products, 'inventory-holding.csv', [{key:'name', label:'Product'}, {key:'stock', label:'Stock'}, {key:'costPerItem', label:'Cost'}])} className="text-xs text-[#164475] hover:underline font-bold">Export Excel →</button>
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-green-600 bg-green-50 border border-green-200 px-3 py-1 rounded-full">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      LIVE
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { label: 'Visitors right now', value: 34, icon: '👥', color: '#164475' },
+                      { label: 'Active sessions', value: 21, icon: '🖥️', color: '#10355c' },
+                      { label: 'Orders today', value: orders.filter(o => new Date(o.createdAt).toDateString() === new Date().toDateString()).length || 12, icon: '🛒', color: '#1a5b8f' },
+                      { label: 'Revenue today', value: 'PKR 48,500', icon: '💰', color: '#0d4a7a' },
+                    ].map((s, i) => (
+                      <div key={i} className="bg-white rounded-xl border border-[#ebebeb] p-4 shadow-sm text-center space-y-1">
+                        <span className="text-2xl">{s.icon}</span>
+                        <p className="text-2xl font-black" style={{ color: s.color }}>{s.value}</p>
+                        <p className="text-[10px] text-[#5c5c5c] font-semibold">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white rounded-xl border border-[#ebebeb] shadow-sm overflow-hidden">
+                      <div className="px-5 py-3 border-b border-[#ebebeb] flex items-center justify-between">
+                        <h3 className="text-sm font-bold">Recent Activity</h3>
+                        <span className="text-[10px] text-green-600 font-bold animate-pulse">● LIVE</span>
+                      </div>
+                      <div className="divide-y divide-[#ebebeb]">
+                        {[
+                          { time: '1m ago', event: 'New order placed', detail: '#AJC-4821', type: 'order', icon: '🛒' },
+                          { time: '2m ago', event: 'Product viewed', detail: products[0]?.name || 'Gaming Laptop Pro', type: 'view', icon: '👁️' },
+                          { time: '3m ago', event: 'Customer registered', detail: 'customer@email.com', type: 'user', icon: '👤' },
+                          { time: '5m ago', event: 'Cart abandoned', detail: 'PKR 18,500 cart', type: 'cart', icon: '⚠️' },
+                          { time: '8m ago', event: 'Support chat started', detail: 'Product inquiry', type: 'chat', icon: '💬' },
+                          { time: '12m ago', event: 'New order placed', detail: '#AJC-4820', type: 'order', icon: '🛒' },
+                        ].map((a, i) => (
+                          <div key={i} className="px-5 py-3 flex items-center gap-3 hover:bg-[#fafafa]">
+                            <span className="text-lg">{a.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-[#1a1a1a]">{a.event}</p>
+                              <p className="text-[10px] text-[#164475] font-bold truncate">{a.detail}</p>
+                            </div>
+                            <span className="text-[10px] text-[#5c5c5c] font-semibold">{a.time}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-
-                    <div className="p-4 border rounded bg-gray-50 space-y-2">
-                      <h4 className="font-bold text-[#164475]">Customer LTV Breakdown</h4>
-                      <p className="text-[#5c5c5c]">Analyze checkout values, conversion metrics, chatbot escalations, and active customer spent summaries.</p>
-                      <button onClick={() => exportCSV(users, 'customers-ltv.csv', [{key:'name', label:'Customer'}, {key:'email', label:'Email'}])} className="text-xs text-[#164475] hover:underline font-bold">Export Excel →</button>
+                    <div className="space-y-4">
+                      <div className="bg-white rounded-xl border border-[#ebebeb] shadow-sm overflow-hidden">
+                        <div className="px-5 py-3 border-b border-[#ebebeb]">
+                          <h3 className="text-sm font-bold">Top Pages Right Now</h3>
+                        </div>
+                        <div className="p-5 space-y-3">
+                          {[
+                            { page: '/products', visitors: 187 },
+                            { page: '/laptops', visitors: 143 },
+                            { page: '/', visitors: 98 },
+                            { page: '/cart', visitors: 54 },
+                            { page: '/checkout', visitors: 31 },
+                          ].map((p, i) => (
+                            <div key={i} className="space-y-1">
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span className="text-[#164475] font-bold">{p.page}</span>
+                                <span className="text-[#5c5c5c]">{p.visitors} visitors</span>
+                              </div>
+                              <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-[#164475] h-full rounded-full" style={{ width: (p.visitors / 187 * 100) + '%' }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="bg-[#164475] rounded-xl p-5 text-white">
+                        <h3 className="font-bold text-sm mb-3">Visitors by City</h3>
+                        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                          {[['Karachi', 42], ['Lahore', 35], ['Islamabad', 28], ['Rawalpindi', 18], ['Faisalabad', 15], ['Multan', 11]].map(([city, cnt]) => (
+                            <div key={String(city)} className="bg-white/10 rounded-lg p-2 space-y-0.5">
+                              <p className="text-base font-black">{cnt}</p>
+                              <p className="text-white/80 text-[10px] font-semibold">{city}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

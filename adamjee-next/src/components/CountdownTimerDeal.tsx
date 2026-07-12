@@ -1,3 +1,4 @@
+'use client';
 import React, { useState, useEffect, useRef } from "react";
 import { ArrowLeft, ArrowRight, ArrowRight as ArrowRightIcon } from "lucide-react";
 import { Product } from "../types";

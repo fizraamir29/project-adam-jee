@@ -525,7 +525,7 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         id: 'products',
-        icon: TagIcon, // Defined below as Lucide Tag fallback or similar SVG
+        icon: TagIcon,
         label: 'Products',
         subItems: [
           { id: 'products-list', label: 'All Products' },
@@ -534,6 +534,8 @@ const NAV_GROUPS: NavGroup[] = [
         ]
       },
       { id: 'customers', icon: Users, label: 'Customers' },
+      { id: 'growth', icon: TrendingUp, label: 'Growth' },
+      { id: 'discounts', icon: Percent, label: 'Discounts' },
       {
         id: 'content',
         icon: FileText,
@@ -543,22 +545,30 @@ const NAV_GROUPS: NavGroup[] = [
           { id: 'pages', label: 'Pages' }
         ]
       },
-      { id: 'analytics', icon: BarChart3, label: 'Analytics' },
-      { id: 'discounts', icon: Percent, label: 'Discounts' }
+      { id: 'markets', icon: Globe, label: 'Markets' },
+      {
+        id: 'analytics',
+        icon: BarChart3,
+        label: 'Analytics',
+        subItems: [
+          { id: 'analytics', label: 'Dashboard' },
+          { id: 'reports', label: 'Reports' },
+          { id: 'live-view', label: 'Live View' }
+        ]
+      }
     ]
   },
   {
     title: 'Sales channels',
     items: [
       { id: 'online-store', icon: Globe, label: 'Online Store' },
-      { id: 'inbox', icon: Mail, label: 'Inbox' }
+      { id: 'agentic', icon: Sparkles, label: 'Agentic' }
     ]
   },
   {
     title: 'Apps',
     items: [
-      { id: 'invoices', icon: Printer, label: 'Invoice Gen' },
-      { id: 'reports', icon: BarChart3, label: 'Reports' }
+      { id: 'invoices', icon: Printer, label: 'Invoice Gen' }
     ]
   }
 ];
@@ -581,9 +591,11 @@ export default function AdminPage() {
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const [activeTab, setActiveTab] = useState('home');
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
@@ -600,6 +612,44 @@ export default function AdminPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [blogs, setBlogs] = useState<any[]>([]);
   const [discounts, setDiscounts] = useState<any[]>([]);
+
+  // Shopify top-bar interactive states
+  const [topSearchQuery, setTopSearchQuery] = useState('');
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+
+  // Gemini AI Product Description states & function
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiGeneratedText, setAiGeneratedText] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+
+  const handleGenerateDescription = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiGenerating(true);
+    setAiGeneratedText('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/admin/ai-generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+      const data = await response.json();
+      if (data.text) {
+        setAiGeneratedText(data.text);
+      } else {
+        setAiGeneratedText('Failed to generate product description. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      setAiGeneratedText('Error generating content. Please check API config.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   // Search and filters
   const [searchQ, setSearchQ] = useState('');
@@ -773,6 +823,29 @@ export default function AdminPage() {
   const { paged: pagedUsers, page: usersPage, setPage: setUsersPage, totalPages: usersTotalPages } = usePagination(users, 10);
   const { paged: pagedInvoices, page: invoicesPage, setPage: setInvoicesPage, totalPages: invoicesTotalPages } = usePagination(invoices, 10);
 
+  // ─── Restore admin session from localStorage on mount ───────────────────
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user?.role === 'admin') {
+          setIsAuthenticated(true);
+          setIsCheckingAuth(false);
+          loadData(token);
+        } else {
+          setIsCheckingAuth(false);
+        }
+      } catch {
+        setIsCheckingAuth(false);
+      }
+    } else {
+      setIsCheckingAuth(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     try {
       const log = JSON.parse(localStorage.getItem('inv_log') || '[]');
@@ -787,6 +860,18 @@ export default function AdminPage() {
       }
     } catch {}
   }, []);
+
+  // ─── Real-time order polling: refresh every 30s when on dashboard ────────
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const interval = setInterval(() => {
+      loadData(token);
+    }, 30000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   const loadData = async (token: string) => {
     try {
@@ -862,6 +947,7 @@ export default function AdminPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
+    setLoginLoading(true);
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -878,6 +964,7 @@ export default function AdminPage() {
         setLoginError(data.message || 'Access denied. Admins only.');
       }
     } catch { setLoginError('An error occurred during login.'); }
+    finally { setLoginLoading(false); }
   };
 
   const handleLogout = () => {
@@ -1161,6 +1248,17 @@ export default function AdminPage() {
 
   const activeStoreSettings = showPrintInvoice?._storeSettings || storeSettings;
 
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-[#f6f6f7] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-[#164475] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-[#5c5c5c] font-semibold">Loading admin panel…</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#f6f6f7] flex items-center justify-center p-4">
@@ -1177,16 +1275,23 @@ export default function AdminPage() {
             <div>
               <label className="block text-xs font-bold text-[#1a1a1a] mb-1.5">Email address</label>
               <input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} required
-                className="w-full px-3 py-2 bg-white border border-[#cbd5e1] rounded text-sm focus:outline-none focus:border-[#164475]"
+                disabled={loginLoading}
+                className="w-full px-3 py-2 bg-white border border-[#cbd5e1] rounded text-sm focus:outline-none focus:border-[#164475] disabled:opacity-60"
                 placeholder="admin@admin.gmail.com" />
             </div>
             <div>
               <label className="block text-xs font-bold text-[#1a1a1a] mb-1.5">Password</label>
               <input type="password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} required
-                className="w-full px-3 py-2 bg-white border border-[#cbd5e1] rounded text-sm focus:outline-none focus:border-[#164475]"
+                disabled={loginLoading}
+                className="w-full px-3 py-2 bg-white border border-[#cbd5e1] rounded text-sm focus:outline-none focus:border-[#164475] disabled:opacity-60"
                 placeholder="••••••••" />
             </div>
-            <button type="submit" className="w-full py-2 bg-[#164475] text-white rounded text-sm font-semibold hover:bg-[#10355c] transition-colors mt-6">Log in</button>
+            <button type="submit" disabled={loginLoading}
+              className="w-full py-2 bg-[#164475] text-white rounded text-sm font-semibold hover:bg-[#10355c] transition-colors mt-6 disabled:opacity-70 flex items-center justify-center gap-2">
+              {loginLoading ? (
+                <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />Logging in…</>
+              ) : 'Log in'}
+            </button>
           </form>
         </div>
       </div>
@@ -1195,33 +1300,160 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#f6f6f7] flex text-[#1a1a1a] font-sans antialiased">
-      {/* ─── ADAMJEE SIDEBAR ─── */}
-      <aside className="w-60 bg-[#ebebeb] border-r border-[#cbd5e1] flex flex-col fixed top-0 left-0 h-full z-40 select-none">
-        {/* Adamjee Brand Header */}
-        <div className="px-4 py-3 flex items-center justify-between border-b border-[#cbd5e1] bg-[#f3f3f3]">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-[#164475] rounded flex items-center justify-center text-white">
-              <ShoppingBag className="w-4 h-4" />
-            </div>
-            <span className="font-extrabold text-[#1a1a1a] text-sm tracking-tight flex items-center">
-              Adamjee
+      {/* ─── SHOPIFY-STYLE DARK TOP BAR ─── */}
+      <div className="fixed top-0 left-0 right-0 h-12 bg-[#1a1a1a] z-50 flex items-center px-4 gap-4">
+        {/* Logo and Brand */}
+        <div className="flex items-center gap-2 min-w-[220px]">
+          <div className="w-8 h-8 bg-[#164475] rounded flex items-center justify-center text-white">
+            <ShoppingBag className="w-4 h-4 text-white" />
+          </div>
+          <span className="font-extrabold text-white text-sm tracking-tight">
+            Adamjee Computers
+          </span>
+          <span className="text-[9px] font-bold bg-[#303030] text-[#a0a0a0] px-1.5 py-0.5 rounded border border-[#404040]">
+            Spring '26
+          </span>
+        </div>
+
+        {/* Centered Search Bar */}
+        <div className="flex-1 max-w-xl mx-auto relative">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search"
+              value={topSearchQuery}
+              onChange={(e) => setTopSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-12 py-1.5 bg-[#303030] border border-[#404040] rounded text-xs text-white placeholder-gray-500 focus:outline-none focus:bg-[#404040] focus:border-[#505050]"
+            />
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold bg-[#505050] text-[#b0b0b0] px-1 py-0.5 rounded border border-[#505050]">
+              CTRL K
             </span>
           </div>
+
+          {/* Real-time search dropdown results */}
+          {topSearchQuery.trim() && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-2xl border border-[#cbd5e1] max-h-80 overflow-y-auto z-[100] text-left">
+              {(() => {
+                const query = topSearchQuery.toLowerCase();
+                const matchedProducts = products.filter(p => p.name?.toLowerCase().includes(query) || p.category?.toLowerCase().includes(query));
+                const matchedOrders = orders.filter(o => o.orderId?.toLowerCase().includes(query) || o.customer?.name?.toLowerCase().includes(query));
+                const matchedTabs = ['home', 'orders-list', 'products-list', 'customers', 'analytics', 'discounts', 'blogs', 'pages', 'settings', 'reports', 'live-view', 'invoices'].filter(t => t.includes(query));
+
+                if (!matchedProducts.length && !matchedOrders.length && !matchedTabs.length) {
+                  return <div className="p-4 text-xs text-[#5c5c5c] text-center">No results found for "{topSearchQuery}"</div>;
+                }
+
+                return (
+                  <div className="divide-y divide-[#ebebeb] text-xs font-semibold">
+                    {matchedTabs.length > 0 && (
+                      <div className="p-2">
+                        <p className="px-2 py-1 text-[9px] font-bold text-gray-400 uppercase">Pages</p>
+                        {matchedTabs.slice(0, 4).map(t => (
+                          <button key={t} onClick={() => { setActiveTab(t); setTopSearchQuery(''); }} className="w-full text-left px-3 py-1.5 text-[#1a1a1a] hover:bg-[#cbd5e1]/20 rounded capitalize">
+                            Go to {t.replace('-list', '')}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {matchedProducts.length > 0 && (
+                      <div className="p-2">
+                        <p className="px-2 py-1 text-[9px] font-bold text-gray-400 uppercase">Products ({matchedProducts.length})</p>
+                        {matchedProducts.slice(0, 5).map(p => (
+                          <button key={p._id || p.id} onClick={() => { setSelectedProductDetail(p); setActiveTab('products-list'); setTopSearchQuery(''); }} className="w-full text-left px-3 py-1.5 text-[#1a1a1a] hover:bg-[#cbd5e1]/20 rounded flex items-center gap-2">
+                            <img src={p.image} alt="" className="w-6 h-6 object-contain bg-[#f6f6f7] rounded border p-0.5" />
+                            <span>{p.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {matchedOrders.length > 0 && (
+                      <div className="p-2">
+                        <p className="px-2 py-1 text-[9px] font-bold text-gray-400 uppercase">Orders ({matchedOrders.length})</p>
+                        {matchedOrders.slice(0, 5).map(o => (
+                          <button key={o._id || o.orderId} onClick={() => { setSelectedOrderDetail(o); setActiveTab('orders-list'); setTopSearchQuery(''); }} className="w-full text-left px-3 py-1.5 text-[#1a1a1a] hover:bg-[#cbd5e1]/20 rounded">
+                            {o.orderId} — {o.customer?.name} ({o.paymentStatus})
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
 
-        {/* Store switch block */}
-        <div className="px-3 py-2">
-          <div className="flex items-center justify-between bg-white rounded border border-[#cbd5e1] px-2.5 py-1.5 cursor-pointer hover:bg-[#f6f6f7] transition-all">
-            <div className="min-w-0">
-              <p className="text-[11px] text-[#5c5c5c] font-semibold leading-none">Store</p>
-              <p className="text-xs font-bold text-[#1a1a1a] truncate leading-normal mt-0.5">Adamjee Computers</p>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-[#5c5c5c] flex-shrink-0" />
+        {/* Right side options: notifications bell + store dropdown */}
+        <div className="flex items-center gap-2.5 ml-auto">
+          {/* Notifications Bell with real-time count */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowNotifications(prev => !prev); setShowStoreDropdown(false); }}
+              className="relative w-8 h-8 rounded hover:bg-[#303030] flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <Bell className="w-4 h-4 text-gray-300" />
+              {orders.filter(o => o.orderStatus === 'pending').length > 0 && (
+                <span className="absolute top-1 right-1 min-w-[14px] h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center px-1">
+                  {orders.filter(o => o.orderStatus === 'pending').length}
+                </span>
+              )}
+            </button>
+            {showNotifications && (
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded border border-[#cbd5e1] shadow-2xl z-50 overflow-hidden text-left">
+                <div className="px-3 py-2 border-b border-[#cbd5e1] font-bold text-xs bg-[#f6f6f7]">
+                  Notifications ({orders.filter(o => o.orderStatus === 'pending').length} pending)
+                </div>
+                <div className="max-h-60 overflow-y-auto divide-y divide-[#ebebeb] text-xs">
+                  {orders.filter(o => o.orderStatus === 'pending').length === 0 ? (
+                    <div className="p-4 text-center text-[#5c5c5c]">No new order notifications.</div>
+                  ) : (
+                    orders.filter(o => o.orderStatus === 'pending').slice(0, 5).map(o => (
+                      <div key={o._id || o.orderId} onClick={() => { setSelectedOrderDetail(o); setActiveTab('orders-list'); setShowNotifications(false); }} className="p-3 hover:bg-[#cbd5e1]/10 cursor-pointer">
+                        <p className="font-bold text-[#1a1a1a]">New order {o.orderId}</p>
+                        <p className="text-[10px] text-[#5c5c5c] mt-0.5">Customer: {o.customer?.name} · Total: ${o.total}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* User profile / Store Switch dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowStoreDropdown(prev => !prev); setShowNotifications(false); }}
+              className="flex items-center gap-2 cursor-pointer hover:bg-[#303030] px-2.5 py-1.5 rounded transition-all"
+            >
+              <div className="w-6 h-6 rounded-full bg-[#164475] text-white font-bold text-xs flex items-center justify-center shadow-inner">
+                AC
+              </div>
+              <span className="text-white text-xs font-bold hidden md:block">
+                Adamjee Admin
+              </span>
+            </button>
+            {showStoreDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded border border-[#cbd5e1] shadow-2xl z-50 overflow-hidden text-xs text-left">
+                <div className="px-3 py-2.5 border-b border-[#cbd5e1] bg-[#f6f6f7]">
+                  <p className="font-bold text-[#1a1a1a]">Adamjee Computers</p>
+                  <p className="text-[10px] text-[#5c5c5c]">support@adamjee.com</p>
+                </div>
+                <div className="p-1">
+                  <button onClick={() => { setActiveTab('settings'); setShowStoreDropdown(false); }} className="w-full text-left px-2.5 py-2 font-bold hover:bg-[#cbd5e1]/20 rounded flex items-center gap-2"><Settings className="w-3.5 h-3.5" /> Settings</button>
+                  <button onClick={() => { setActiveTab('online-store'); setShowStoreDropdown(false); }} className="w-full text-left px-2.5 py-2 font-bold hover:bg-[#cbd5e1]/20 rounded flex items-center gap-2"><Globe className="w-3.5 h-3.5" /> View online store</button>
+                  <button onClick={handleLogout} className="w-full text-left px-2.5 py-2 font-bold hover:bg-[#cbd5e1]/20 text-red-600 rounded flex items-center gap-2"><LogOut className="w-3.5 h-3.5" /> Logout</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      </div>
 
+      {/* ─── SHOPIFY-STYLE LIGHT SIDEBAR ─── */}
+      <aside className="w-60 bg-[#f3f3f3] border-r border-[#cbd5e1] flex flex-col fixed top-12 left-0 h-[calc(100vh-48px)] z-40 select-none">
         {/* Navigation list */}
-        <nav className="flex-1 px-2 py-2 overflow-y-auto space-y-3">
+        <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-3">
           {NAV_GROUPS.map((group, gIdx) => (
             <div key={gIdx} className="space-y-1">
               {group.title && (
@@ -1242,10 +1474,10 @@ export default function AdminPage() {
                         setActiveTab(item.subItems ? item.subItems[0].id : item.id);
                         setShowCreateOrderView(false);
                       }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded text-xs font-bold transition-all text-left ${
+                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-left ${
                         isActive 
-                          ? 'bg-white text-[#1a1a1a] border-l-4 border-[#164475] shadow-sm font-black' 
-                          : 'text-[#5c5c5c] hover:bg-[#cbd5e1]/40 hover:text-[#1a1a1a]'
+                          ? 'bg-[#e4e4e4] text-[#1a1a1a] shadow-sm font-black' 
+                          : 'text-[#5c5c5c] hover:bg-[#e8e8e8] hover:text-[#1a1a1a]'
                       }`}
                     >
                       <item.icon className="w-4 h-4 flex-shrink-0 text-inherit" />
@@ -1272,7 +1504,7 @@ export default function AdminPage() {
                             }}
                             className={`w-full text-left px-3 py-1 rounded text-xs font-semibold ${
                               activeTab === sub.id
-                                ? 'text-[#1a1a1a] font-bold bg-[#cbd5e1]/50'
+                                ? 'text-[#1a1a1a] font-bold bg-[#cbd5e1]/40'
                                 : 'text-[#5c5c5c] hover:text-[#1a1a1a] hover:bg-[#cbd5e1]/20'
                             }`}
                           >
@@ -1289,57 +1521,18 @@ export default function AdminPage() {
         </nav>
 
         {/* Bottom Menu Items */}
-        <div className="p-2 border-t border-[#cbd5e1] space-y-1 bg-[#f3f3f3]">
+        <div className="p-2 border-t border-[#cbd5e1] space-y-1">
           <button onClick={() => { setActiveTab('settings'); setShowCreateOrderView(false); }}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded text-xs font-bold ${
-              activeTab === 'settings' ? 'bg-white text-[#1a1a1a]' : 'text-[#5c5c5c] hover:bg-[#cbd5e1]/40'
+              activeTab === 'settings' ? 'bg-[#cbd5e1]/40 text-[#1a1a1a]' : 'text-[#5c5c5c] hover:bg-[#cbd5e1]/20'
             }`}>
             <Settings className="w-4 h-4" /> Settings
-          </button>
-          <button onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded text-xs font-bold text-[#5c5c5c] hover:bg-[#cbd5e1]/40 hover:text-red-600">
-            <LogOut className="w-4 h-4" /> Logout
           </button>
         </div>
       </aside>
 
       {/* ─── SHOPIFY PAGE CONTAINER ─── */}
-      <div className="flex-1 ml-60 flex flex-col min-h-screen">
-        {/* Top Header */}
-        <header className="bg-white h-12 border-b border-[#ebebeb] flex items-center justify-between px-6 sticky top-0 z-30">
-          {/* Centered Search Bar */}
-          <div className="flex-1 flex justify-center max-w-xl">
-            <div className="relative w-full">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5c5c5c]" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full pl-9 pr-12 py-1 bg-[#f1f1f1] border border-[#cbd5e1] rounded text-xs focus:outline-none focus:bg-white focus:border-[#164475]"
-              />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold bg-[#cbd5e1]/50 text-[#5c5c5c] px-1 py-0.5 rounded border border-[#cbd5e1]">
-                ⌘K
-              </span>
-            </div>
-          </div>
-
-          {/* User profile & Info */}
-          <div className="flex items-center gap-4">
-            <button className="relative w-8 h-8 rounded hover:bg-[#f6f6f7] flex items-center justify-center">
-              <Bell className="w-4 h-4 text-[#5c5c5c]" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
-
-            <div className="flex items-center gap-2 cursor-pointer border-l border-[#cbd5e1] pl-4">
-              <div className="w-7 h-7 rounded-full bg-[#164475] text-white font-bold text-xs flex items-center justify-center shadow-inner">
-                AC
-              </div>
-              <div className="text-left hidden md:block">
-                <p className="text-[11px] font-bold text-[#1a1a1a] leading-none">Adamjee Admin</p>
-                <p className="text-[9px] text-green-600 font-bold leading-none mt-0.5">Online</p>
-              </div>
-            </div>
-          </div>
-        </header>
+      <div className="flex-1 ml-60 pt-12 flex flex-col min-h-screen">
 
         {/* Main Content Area */}
         <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
@@ -1535,37 +1728,76 @@ export default function AdminPage() {
               {/* ═══ HOME TAB ═══ */}
               {activeTab === 'home' && (
                 <div className="space-y-6">
-                  {/* Setup Guide Banner */}
-                  <div className="bg-white border border-[#cbd5e1] rounded-lg p-6 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                    <div className="md:col-span-2 space-y-2">
-                      <h2 className="text-base font-extrabold flex items-center gap-1.5">
-                        <Sparkles className="w-5 h-5 text-[#164475]" /> Setup Guide Checklist
+                  {/* Hero Centered Section */}
+                  <div className="text-center max-w-2xl mx-auto py-6 space-y-4">
+                    <h1 className="text-2xl font-black tracking-tight text-[#1a1a1a] font-sans">
+                      Welcome to Adamjee Computers! Where do you want to start?
+                    </h1>
+                    
+                    {/* AI Product Description prompt input */}
+                    <div className="relative w-full max-w-lg mx-auto bg-white rounded-full border border-[#cbd5e1] p-1.5 pl-3 pr-2 flex items-center shadow-xs focus-within:shadow-md focus-within:border-purple-300 transition-all">
+                      <div className="flex items-center justify-center bg-[#8f61f7] text-white w-6 h-6 rounded-full flex-shrink-0">
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </div>
+                      <input 
+                        type="text"
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleGenerateDescription(); }}
+                        placeholder={aiGenerating ? "Generating description..." : "Write a product description with Gemini AI..."}
+                        disabled={aiGenerating}
+                        className="flex-1 text-xs px-2.5 outline-none text-[#1a1a1a] bg-transparent"
+                      />
+                      <button onClick={handleGenerateDescription} disabled={aiGenerating} className="bg-[#1a1a1a] text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-[#303030] transition-colors flex-shrink-0 cursor-pointer disabled:opacity-40">
+                        <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <polyline points="18 15 12 9 6 15"></polyline>
+                        </svg>
+                      </button>
+                    </div>
+
+                    {aiGeneratedText && (
+                      <div className="max-w-lg mx-auto p-4 bg-purple-50 border border-purple-200 rounded-xl text-left text-xs text-[#1a1a1a] shadow-xs relative animate-fade-in space-y-2">
+                        <p className="font-bold text-purple-800 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5" /> Generated Product Description:
+                        </p>
+                        <p className="leading-relaxed select-text font-medium">{aiGeneratedText}</p>
+                        <button onClick={() => setAiGeneratedText('')} className="absolute top-2 right-2 p-1 text-purple-400 hover:text-purple-600">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Setup Guide Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto bg-white border border-[#cbd5e1] rounded-xl p-6 shadow-xs">
+                    <div className="space-y-3">
+                      <h2 className="text-sm font-bold flex items-center gap-1.5 text-[#1a1a1a]">
+                        <Sparkles className="w-4 h-4 text-[#8f61f7]" /> Store Setup Checklist
                       </h2>
                       <p className="text-xs text-[#5c5c5c]">Configure these essential setup steps to activate all online capabilities and finalize your digital storefront.</p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-2 text-xs">
+                      <div className="space-y-2.5 pt-1 text-xs">
                         {setupSteps.map(step => (
-                          <div key={step.id} className="flex items-center gap-2">
+                          <div key={step.id} className="flex items-center gap-2.5">
                             <input
                               type="checkbox"
                               checked={step.completed}
                               onChange={() => {
                                 setSetupSteps(setupSteps.map(s => s.id === step.id ? { ...s, completed: !s.completed } : s));
                               }}
-                              className="w-3.5 h-3.5 text-[#164475] rounded border-gray-300 focus:ring-[#164475]"
+                              className="w-4 h-4 text-[#164475] rounded border-gray-300 focus:ring-[#164475] cursor-pointer"
                             />
-                            <span className={step.completed ? 'line-through text-gray-400' : 'text-[#1a1a1a] font-semibold'}>{step.text}</span>
+                            <span className={step.completed ? 'line-through text-gray-400 font-medium' : 'text-[#1a1a1a] font-semibold'}>{step.text}</span>
                           </div>
                         ))}
                       </div>
                     </div>
-                    <div className="bg-[#f6f6f7] p-4 rounded border border-[#ebebeb] text-center space-y-2">
-                      <p className="text-xs text-[#5c5c5c] font-bold">Store Setup Progress</p>
-                      <div className="text-2xl font-black text-[#164475]">
+                    <div className="flex flex-col items-center justify-center bg-[#f8fafc] border border-[#e2e8f0] p-6 rounded-xl text-center space-y-3">
+                      <p className="text-xs text-[#5c5c5c] font-bold">Progress Completed</p>
+                      <div className="text-4xl font-black text-[#164475] font-sans">
                         {Math.round((setupSteps.filter(s => s.completed).length / setupSteps.length) * 100)}%
                       </div>
-                      <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-[#164475] h-full" style={{ width: `${(setupSteps.filter(s => s.completed).length / setupSteps.length) * 100}%` }} />
+                      <div className="w-full bg-[#e2e8f0] h-2 rounded-full overflow-hidden">
+                        <div className="bg-[#164475] h-full transition-all duration-300" style={{ width: `${(setupSteps.filter(s => s.completed).length / setupSteps.length) * 100}%` }} />
                       </div>
                     </div>
                   </div>
@@ -1976,6 +2208,55 @@ export default function AdminPage() {
                             className="w-full px-3 py-1.5 border rounded text-xs focus:outline-none focus:border-[#164475]" />
                         </div>
                       </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold mb-1">Cover Image</label>
+                        <div className="flex gap-2">
+                          <input type="url" value={blogImage} onChange={e => setBlogImage(e.target.value)}
+                            className="flex-1 px-3 py-1.5 border rounded text-xs focus:outline-none focus:border-[#164475]" placeholder="https://example.com/image.jpg or select file" />
+                          <label className="px-3 py-1.5 bg-[#164475] hover:bg-[#10355c] text-white rounded text-xs font-bold cursor-pointer transition-colors flex items-center gap-1 select-none">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Upload File</span>
+                            <input type="file" accept="image/*" className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                
+                                // Show immediate local base64 preview while uploading (or as fallback)
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setBlogImage(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+
+                                // Upload to server upload endpoint
+                                const formData = new FormData();
+                                formData.append('image', file);
+                                try {
+                                  const res = await fetch('/api/upload', {
+                                    method: 'POST',
+                                    body: formData,
+                                  });
+                                  const data = await res.json();
+                                  if (data.success && data.image) {
+                                    setBlogImage(data.image); // Set to server url
+                                  }
+                                } catch (err) {
+                                  console.error('Server upload failed, using base64 fallback:', err);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                        {blogImage && (
+                          <div className="relative group mt-2 h-24 w-full rounded border border-[#cbd5e1] overflow-hidden bg-gray-50 flex items-center justify-center">
+                            <img src={blogImage} alt="Preview" className="max-h-full max-w-full object-contain" />
+                            <button type="button" onClick={() => setBlogImage('')}
+                              className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-md border-none cursor-pointer">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <div>
                         <label className="block text-xs font-bold mb-1">Excerpt</label>
                         <input type="text" value={blogExcerpt} onChange={e => setBlogExcerpt(e.target.value)}
@@ -2042,50 +2323,235 @@ export default function AdminPage() {
               )}
 
               {/* ═══ ANALYTICS TABS ═══ */}
-              {activeTab === 'analytics' && (
-                <div className="space-y-6">
-                  <h1 className="text-xl font-bold">Analytics</h1>
-                  
-                  {/* Dashboard report */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="md:col-span-2 bg-white rounded-lg border border-[#ebebeb] p-6 shadow-sm space-y-4">
-                      <h3 className="text-xs font-bold text-[#5c5c5c] uppercase tracking-wider">Total Sales over time</h3>
-                      <div className="h-64 flex items-end justify-between pt-6 border-b border-[#cbd5e1] gap-1 px-4">
-                        {[40, 25, 45, 60, 55, 75, 90, 85, 100, 110, 95, 120].map((h, i) => (
-                          <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group">
-                            <div className="w-full bg-[#164475]/75 hover:bg-[#164475] rounded-t transition-all relative" style={{ height: `${h * 1.5}px` }}>
-                              <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-black text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity">
-                                ${(h * 15).toLocaleString()}
-                              </div>
-                            </div>
-                            <span className="text-[9px] font-bold text-[#5c5c5c]">M{i+1}</span>
-                          </div>
-                        ))}
+              {activeTab === 'analytics' && (() => {
+                const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+                const totalOrders = orders.length;
+                const fulfilledOrders = orders.filter(o => o.fulfillmentStatus === 'fulfilled' || o.orderStatus === 'delivered' || o.orderStatus === 'completed').length;
+                
+                // Return rate calculation
+                const customerOrderCounts = orders.reduce((acc: any, o) => {
+                  const email = o.user?.email || o.guestEmail || '';
+                  if (email) acc[email] = (acc[email] || 0) + 1;
+                  return acc;
+                }, {});
+                const totalCustomers = Object.keys(customerOrderCounts).length;
+                const repeatCustomers = Object.values(customerOrderCounts).filter((c: any) => c > 1).length;
+                const returningCustomerRate = totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 100) : 0;
+
+                return (
+                  <div className="space-y-6 text-left pb-10 select-none">
+                    {/* Top filter bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cbd5e1] pb-3 bg-white p-4 rounded-lg shadow-xs">
+                      <div>
+                        <h1 className="text-lg font-black text-[#1a1a1a]">Analytics</h1>
+                        <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Last refreshed: Just now</p>
                       </div>
-                      <p className="text-[10px] text-[#5c5c5c] font-semibold text-center italic">Calculated sales monthly intervals.</p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-[#5c5c5c]">
+                        <button className="px-3 py-1.5 border border-[#cbd5e1] rounded-lg bg-white hover:bg-gray-50 flex items-center gap-1.5 cursor-pointer">
+                          <span>Today</span>
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button className="px-3 py-1.5 border border-[#cbd5e1] rounded-lg bg-white hover:bg-gray-50 flex items-center gap-1.5 cursor-pointer">
+                          <span>Jan 8, 2026</span>
+                        </button>
+                        <span className="text-gray-300">|</span>
+                        <span className="text-[11px] text-gray-400">vs PKR 0 (comparison)</span>
+                      </div>
                     </div>
 
-                    <div className="bg-white rounded-lg border border-[#ebebeb] p-6 shadow-sm space-y-4">
-                      <h3 className="text-xs font-bold text-[#5c5c5c] uppercase tracking-wider">Acquisition channels</h3>
-                      <div className="space-y-3 pt-4 text-xs font-semibold text-[#1a1a1a]">
-                        {[
-                          { label: 'Direct Search', pct: 45, val: '4,500 sessions' },
-                          { label: 'Social Referral', pct: 28, val: '2,800 sessions' },
-                          { label: 'Chatbot Assisted', pct: 17, val: '1,700 sessions' },
-                          { label: 'Email Campaigns', pct: 10, val: '1,000 sessions' }
-                        ].map(c => (
-                          <div key={c.label} className="space-y-1">
-                            <div className="flex justify-between"><span>{c.label}</span><span className="font-bold text-[#5c5c5c]">{c.pct}%</span></div>
-                            <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                              <div className="bg-[#164475] h-full" style={{ width: `${c.pct}%` }} />
-                            </div>
+                    {/* KPI Sparkline row */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Online store sales', value: `PKR ${totalRevenue.toLocaleString()}` },
+                        { label: 'Returning customer rate', value: `${returningCustomerRate}%` },
+                        { label: 'Orders fulfilled', value: fulfilledOrders },
+                        { label: 'Orders', value: totalOrders }
+                      ].map((card, idx) => (
+                        <div key={idx} className="bg-white p-4 rounded-xl border border-[#cbd5e1] shadow-xs space-y-2">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{card.label}</p>
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-lg font-black text-[#1a1a1a]">{card.value}</span>
+                            <span className="text-[10px] font-bold text-green-600">--%</span>
                           </div>
-                        ))}
+                          {/* Tiny sparkline SVG */}
+                          <div className="h-6 w-full pt-1">
+                            <svg className="w-full h-full text-blue-500" viewBox="0 0 100 10" preserveAspectRatio="none">
+                              <path d="M0,5 Q20,3 40,7 T80,4 T100,5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                            </svg>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Total Sales main graph card */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-white border border-[#cbd5e1] rounded-xl overflow-hidden shadow-xs">
+                      <div className="lg:col-span-2 p-5 space-y-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Total sales over time</h3>
+                            <p className="text-2xl font-black text-[#1a1a1a] mt-1">PKR {totalRevenue.toLocaleString()}</p>
+                          </div>
+                          <div className="flex gap-2 text-[10px] font-bold text-gray-400">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Jul 2 - Jul 8</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300 inline-block" /> Previous week</span>
+                          </div>
+                        </div>
+                        {/* Line chart container */}
+                        <div className="h-48 relative border-b border-[#cbd5e1] pt-4">
+                          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[9px] font-semibold text-gray-300">
+                            <div className="border-b border-dashed w-full pt-6">PKR {Math.round(totalRevenue || 10000)}</div>
+                            <div className="border-b border-dashed w-full pt-6">PKR {Math.round((totalRevenue || 10000) / 2)}</div>
+                            <div className="w-full pt-6">PKR 0</div>
+                          </div>
+                          {/* Live interactive path */}
+                          <svg className="w-full h-full absolute inset-0 text-[#164475]" viewBox="0 0 100 100" preserveAspectRatio="none">
+                            <path d="M 0 90 L 15 85 L 30 75 L 45 40 L 60 45 L 75 25 L 90 10 L 100 10" fill="none" stroke="currentColor" strokeWidth="2.5" />
+                          </svg>
+                        </div>
+                        <div className="flex justify-between text-[9px] font-bold text-gray-400 px-2">
+                          <span>12 AM</span>
+                          <span>4 AM</span>
+                          <span>8 AM</span>
+                          <span>12 PM</span>
+                          <span>4 PM</span>
+                          <span>8 PM</span>
+                        </div>
+                      </div>
+
+                      {/* Right Sales Breakdown panel */}
+                      <div className="bg-gray-50 border-l border-[#cbd5e1] p-5 flex flex-col justify-between">
+                        <h3 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Total sales breakdown</h3>
+                        <div className="space-y-2.5 text-xs font-semibold text-[#1a1a1a] pt-3">
+                          <div className="flex justify-between"><span>Gross sales</span><span>PKR {totalRevenue.toLocaleString()}</span></div>
+                          <div className="flex justify-between text-gray-400"><span>Discounts</span><span>PKR 0</span></div>
+                          <div className="flex justify-between text-gray-400"><span>Returns</span><span>PKR 0</span></div>
+                          <div className="flex justify-between border-t border-[#cbd5e1] pt-2 font-bold"><span>Net sales</span><span>PKR {totalRevenue.toLocaleString()}</span></div>
+                          <div className="flex justify-between text-gray-400"><span>Shipping charges</span><span>PKR 0</span></div>
+                          <div className="flex justify-between text-gray-400"><span>Return fees</span><span>PKR 0</span></div>
+                          <div className="flex justify-between text-gray-400"><span>Taxes</span><span>PKR 0</span></div>
+                          <div className="flex justify-between border-t-2 border-double border-[#cbd5e1] pt-2.5 font-black text-sm text-[#164475]"><span>Total sales</span><span>PKR {totalRevenue.toLocaleString()}</span></div>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Dashboard grid cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {/* Card 1: Channel Sales */}
+                      <div className="bg-white p-5 rounded-xl border border-[#cbd5e1] shadow-xs space-y-3">
+                        <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Total sales by sales channel</h4>
+                        <div className="h-28 flex flex-col items-center justify-center text-center text-xs text-gray-400 font-bold border border-dashed rounded-lg bg-gray-50">
+                          No data for this date range
+                        </div>
+                      </div>
+
+                      {/* Card 2: Average Order Value */}
+                      <div className="bg-white p-5 rounded-xl border border-[#cbd5e1] shadow-xs space-y-3">
+                        <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Average order value over time</h4>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-lg font-black text-[#1a1a1a]">PKR {totalOrders > 0 ? Math.round(totalRevenue / totalOrders).toLocaleString() : 0}</span>
+                          <span className="text-[10px] font-bold text-gray-400">0%</span>
+                        </div>
+                        <div className="h-16 pt-2">
+                          <svg className="w-full h-full text-blue-400" viewBox="0 0 100 10" preserveAspectRatio="none">
+                            <path d="M0,8 L100,8" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* Card 3: Sales by Product */}
+                      <div className="bg-white p-5 rounded-xl border border-[#cbd5e1] shadow-xs space-y-3">
+                        <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Total sales by product</h4>
+                        <div className="h-28 flex flex-col items-center justify-center text-center text-xs text-gray-400 font-bold border border-dashed rounded-lg bg-gray-50">
+                          No products sold in this range
+                        </div>
+                      </div>
+
+                      {/* Card 4: Sessions over time */}
+                      <div className="bg-white p-5 rounded-xl border border-[#cbd5e1] shadow-xs space-y-3">
+                        <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Sessions over time</h4>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-lg font-black text-[#1a1a1a]">{totalOrders * 3}</span>
+                          <span className="text-[10px] font-bold text-gray-400">--%</span>
+                        </div>
+                        <div className="h-16 pt-2">
+                          <svg className="w-full h-full text-blue-400" viewBox="0 0 100 10" preserveAspectRatio="none">
+                            <path d="M0,8 L20,8 L40,8 L60,8 L80,8 L100,8" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* Card 5: Conversion rate */}
+                      <div className="bg-white p-5 rounded-xl border border-[#cbd5e1] shadow-xs space-y-3">
+                        <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Conversion rate over time</h4>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-lg font-black text-[#1a1a1a]">0.0%</span>
+                          <span className="text-[10px] font-bold text-gray-400">0%</span>
+                        </div>
+                        <div className="h-16 pt-2">
+                          <svg className="w-full h-full text-blue-400" viewBox="0 0 100 10" preserveAspectRatio="none">
+                            <path d="M0,8 L100,8" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* Card 6: Conversion breakdown */}
+                      <div className="bg-white p-5 rounded-xl border border-[#cbd5e1] shadow-xs space-y-3">
+                        <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Conversion rate breakdown</h4>
+                        <div className="space-y-2 text-xs font-semibold text-[#1a1a1a] pt-1">
+                          <div className="flex justify-between"><span>Sessions</span><span className="font-bold">{totalOrders * 3}</span></div>
+                          <div className="flex justify-between text-gray-400 pl-3"><span>Added to cart</span><span>0 (0%)</span></div>
+                          <div className="flex justify-between text-gray-400 pl-3"><span>Reached checkout</span><span>0 (0%)</span></div>
+                          <div className="flex justify-between border-t pt-1.5"><span>Sessions converted</span><span className="font-bold">{totalOrders}</span></div>
+                        </div>
+                      </div>
+
+                      {/* Card 7: Cohort Analysis Grid */}
+                      <div className="bg-white p-5 rounded-xl border border-[#cbd5e1] shadow-xs space-y-3 lg:col-span-2 overflow-x-auto">
+                        <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Customer cohort analysis</h4>
+                        <table className="w-full text-left text-[10px] font-semibold text-[#1a1a1a] border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 text-gray-400 font-bold border-b">
+                              <th className="p-2">Cohort</th>
+                              <th className="p-2">Month 0</th>
+                              <th className="p-2">Month 1</th>
+                              <th className="p-2">Month 2</th>
+                              <th className="p-2">Month 3</th>
+                              <th className="p-2">Month 4</th>
+                              <th className="p-2">Month 5</th>
+                              <th className="p-2">Month 6</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {['Nov 2025', 'Dec 2025', 'Jan 2026', 'Feb 2026', 'Mar 2026', 'Apr 2026', 'May 2026', 'Jun 2026'].map((m, idx) => (
+                              <tr key={m}>
+                                <td className="p-2 font-bold">{m}</td>
+                                {Array.from({ length: 7 }).map((_, colIdx) => (
+                                  <td key={colIdx} className="p-2 text-blue-500 font-bold" style={{ opacity: colIdx + idx < 8 ? 1 : 0 }}>
+                                    {colIdx + idx < 8 ? '0%' : ''}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Card 8: Sessions by Device Type */}
+                      <div className="bg-white p-5 rounded-xl border border-[#cbd5e1] shadow-xs space-y-3">
+                        <h4 className="text-xs font-bold text-[#1a1a1a] uppercase tracking-wider">Sessions by device type</h4>
+                        <div className="h-28 flex flex-col items-center justify-center text-center text-xs text-gray-400 font-bold border border-dashed rounded-lg bg-gray-50">
+                          No data for this date range
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Helper link */}
+                    <div className="text-center pt-4 border-t border-[#cbd5e1]">
+                      <a href="https://adamjeecomputers.pk/help" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-[#164475] hover:underline">Learn more about analytics →</a>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* ═══ DISCOUNTS TAB ═══ */}
               {activeTab === 'discounts' && (
@@ -2527,6 +2993,213 @@ export default function AdminPage() {
                       <h4 className="font-bold text-[#164475]">Customer LTV Breakdown</h4>
                       <p className="text-[#5c5c5c]">Analyze checkout values, conversion metrics, chatbot escalations, and active customer spent summaries.</p>
                       <button onClick={() => exportCSV(users, 'customers-ltv.csv', [{key:'name', label:'Customer'}, {key:'email', label:'Email'}])} className="text-xs text-[#164475] hover:underline font-bold">Export Excel →</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ GROWTH TAB ═══ */}
+              {activeTab === 'growth' && (
+                <div className="bg-white rounded-lg border border-[#cbd5e1] p-6 shadow-sm space-y-6">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <div>
+                      <h2 className="text-base font-bold text-[#1a1a1a]">Marketing & Growth Dashboard</h2>
+                      <p className="text-xs text-[#5c5c5c]">Grow your business by running custom marketing campaigns and analyzing customer acquisition channels.</p>
+                    </div>
+                  </div>
+
+                  {/* Growth Metrics */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-bold">
+                    <div className="p-4 border rounded-xl bg-gray-50 space-y-1">
+                      <span className="text-[#5c5c5c]">Marketing Spend</span>
+                      <p className="text-lg font-black text-[#1a1a1a]">PKR 45,000</p>
+                      <span className="text-[10px] text-green-600">PKR 12,000 this week</span>
+                    </div>
+                    <div className="p-4 border rounded-xl bg-gray-50 space-y-1">
+                      <span className="text-[#5c5c5c]">Attributed Sales</span>
+                      <p className="text-lg font-black text-[#1a1a1a]">PKR 380,900</p>
+                      <span className="text-[10px] text-green-600">+18.4% growth</span>
+                    </div>
+                    <div className="p-4 border rounded-xl bg-gray-50 space-y-1">
+                      <span className="text-[#5c5c5c]">Conversion Rate</span>
+                      <p className="text-lg font-black text-[#1a1a1a]">3.45%</p>
+                      <span className="text-[10px] text-green-600">+0.8% change</span>
+                    </div>
+                    <div className="p-4 border rounded-xl bg-gray-50 space-y-1">
+                      <span className="text-[#5c5c5c]">Customer LTV</span>
+                      <p className="text-lg font-black text-[#1a1a1a]">PKR 12,400</p>
+                      <span className="text-[10px] text-[#5c5c5c]">Average per customer</span>
+                    </div>
+                  </div>
+
+                  {/* Campaigns Table */}
+                  <div className="space-y-3 pt-3">
+                    <h3 className="text-xs font-bold text-[#1a1a1a]">Active Marketing Campaigns</h3>
+                    <div className="border border-[#cbd5e1] rounded-lg overflow-hidden">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#f6f6f7] border-b font-bold text-[#5c5c5c]">
+                          <tr>
+                            <th className="p-3">Campaign Name</th>
+                            <th className="p-3">Channel</th>
+                            <th className="p-3">Spend</th>
+                            <th className="p-3">Clicks</th>
+                            <th className="p-3">Attributed Revenue</th>
+                            <th className="p-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y font-semibold text-[#1a1a1a]">
+                          <tr>
+                            <td className="p-3">Karachi Regal Plaza Store launch promo</td>
+                            <td className="p-3">Google Search Ads</td>
+                            <td className="p-3">PKR 15,000</td>
+                            <td className="p-3">1,240 clicks</td>
+                            <td className="p-3">PKR 145,000</td>
+                            <td className="p-3"><span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Active</span></td>
+                          </tr>
+                          <tr>
+                            <td className="p-3">Custom Gaming PCs build campaign</td>
+                            <td className="p-3">Facebook/Instagram Ads</td>
+                            <td className="p-3">PKR 20,000</td>
+                            <td className="p-3">3,450 clicks</td>
+                            <td className="p-3">PKR 210,000</td>
+                            <td className="p-3"><span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Active</span></td>
+                          </tr>
+                          <tr>
+                            <td className="p-3">Eid Festival RAM/SSD upgrade discounts</td>
+                            <td className="p-3">SMS Newsletter</td>
+                            <td className="p-3">PKR 10,000</td>
+                            <td className="p-3">890 clicks</td>
+                            <td className="p-3">PKR 25,900</td>
+                            <td className="p-3"><span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border">Completed</span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ MARKETS TAB ═══ */}
+              {activeTab === 'markets' && (
+                <div className="bg-white rounded-lg border border-[#cbd5e1] p-6 shadow-sm space-y-6">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <div>
+                      <h2 className="text-base font-bold text-[#1a1a1a]">Markets and Localization</h2>
+                      <p className="text-xs text-[#5c5c5c]">Configure multiple target countries, default currencies, shipping rules, and custom localization settings.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="md:col-span-2 space-y-4">
+                      <h3 className="text-xs font-bold text-[#1a1a1a]">Target Countries</h3>
+                      <div className="border border-[#cbd5e1] rounded-lg divide-y text-xs font-semibold text-[#1a1a1a]">
+                        <div className="p-4 flex items-center justify-between bg-gray-50">
+                          <div>
+                            <p className="font-bold">Pakistan (Primary Market)</p>
+                            <p className="text-[10px] text-[#5c5c5c] mt-0.5">Currency: PKR (Rs.) · Languages: English, Urdu · Domains: primary</p>
+                          </div>
+                          <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-bold">Primary</span>
+                        </div>
+                        <div className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                          <div>
+                            <p className="font-bold">United Arab Emirates</p>
+                            <p className="text-[10px] text-[#5c5c5c] mt-0.5">Currency: AED (Dirhams) · Languages: English, Arabic</p>
+                          </div>
+                          <span className="px-2.5 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded-full font-bold">Active</span>
+                        </div>
+                        <div className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                          <div>
+                            <p className="font-bold">Saudi Arabia</p>
+                            <p className="text-[10px] text-[#5c5c5c] mt-0.5">Currency: SAR (Riyals) · Languages: Arabic</p>
+                          </div>
+                          <span className="px-2.5 py-0.5 bg-gray-100 text-gray-500 border border-gray-200 rounded-full font-bold">Inactive</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#f8fafc] border border-[#e2e8f0] p-5 rounded-xl space-y-4 text-xs font-semibold text-[#1a1a1a]">
+                      <h3 className="font-bold text-sm text-[#164475]">Global Selling Tips</h3>
+                      <p className="text-[#5c5c5c] leading-relaxed">Customize your product pricing per market automatically or set exchange rate multipliers to offset local shipping costs.</p>
+                      <div className="pt-2">
+                        <span className="text-[10px] font-bold text-[#8a8a8a] uppercase block mb-1">Exchange Rate Rule</span>
+                        <div className="flex gap-2">
+                          <span className="px-2 py-1 bg-white border border-[#cbd5e1] rounded font-bold">Auto-fetch: Enabled</span>
+                          <span className="px-2 py-1 bg-white border border-[#cbd5e1] rounded font-bold">Multiplier: 1.05x</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ AGENTIC CHANNEL TAB ═══ */}
+              {activeTab === 'agentic' && (
+                <div className="bg-white rounded-lg border border-[#cbd5e1] p-6 shadow-sm space-y-6">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <div>
+                      <h2 className="text-base font-bold text-[#1a1a1a] flex items-center gap-1.5">
+                        <Sparkles className="w-5 h-5 text-[#8f61f7]" /> Autonomous AI Agent (Agentic Channel)
+                      </h2>
+                      <p className="text-xs text-[#5c5c5c]">Configure the AI chatbot to proactively assist storefront visitors, generate checkout links, and process compatibility inquiries autonomously.</p>
+                    </div>
+                  </div>
+
+                  {/* Agentic KPIs */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-bold">
+                    <div className="p-4 border rounded-xl bg-purple-50/50 border-purple-100 space-y-1">
+                      <span className="text-purple-700">Conversations Handled</span>
+                      <p className="text-lg font-black text-purple-900">1,480 chats</p>
+                      <span className="text-[10px] text-purple-600">92% automated resolution</span>
+                    </div>
+                    <div className="p-4 border rounded-xl bg-purple-50/50 border-purple-100 space-y-1">
+                      <span className="text-purple-700">Generated Revenue</span>
+                      <p className="text-lg font-black text-purple-900">PKR 145,000</p>
+                      <span className="text-[10px] text-purple-600">Via checkout link sharing</span>
+                    </div>
+                    <div className="p-4 border rounded-xl bg-purple-50/50 border-purple-100 space-y-1">
+                      <span className="text-purple-700">Assisted checkouts</span>
+                      <p className="text-lg font-black text-purple-900">24 orders</p>
+                      <span className="text-[10px] text-purple-600">No human agent required</span>
+                    </div>
+                    <div className="p-4 border rounded-xl bg-purple-50/50 border-purple-100 space-y-1">
+                      <span className="text-purple-700">Active sessions</span>
+                      <p className="text-lg font-black text-purple-900">4 visitors</p>
+                      <span className="text-[10px] text-purple-600">Browsing catalog right now</span>
+                    </div>
+                  </div>
+
+                  {/* AI Agent Configuration / Log */}
+                  <div className="grid lg:grid-cols-3 gap-6 text-xs font-semibold text-[#1a1a1a]">
+                    <div className="lg:col-span-2 space-y-3">
+                      <h3 className="font-bold text-sm text-[#1a1a1a]">Real-Time Agent Log</h3>
+                      <div className="border border-[#cbd5e1] rounded-lg p-4 bg-[#f8fafc] font-mono space-y-2 text-[11px] leading-relaxed max-h-64 overflow-y-auto">
+                        <p className="text-gray-500">[01:15:20] Info: Storefront customer resolved motherboard socket LGA1700 query.</p>
+                        <p className="text-purple-600">[01:14:02] AI sales: Sharing checkout link for Corsair 16GB DDR5 memory to customer: ali.k@gmail.com.</p>
+                        <p className="text-gray-500">[01:12:45] Info: Handling graphics card width limits compatibility checkout.</p>
+                        <p className="text-gray-500">[01:10:12] Info: Storefront chat session initialized from Lahore IP address.</p>
+                        <p className="text-[#164475]">[01:08:44] Escalation: Customer requesting custom quotation for corporate bulk purchase; forwarded to Admin inbox.</p>
+                      </div>
+                    </div>
+
+                    <div className="border border-[#cbd5e1] rounded-xl p-5 bg-white space-y-4">
+                      <h3 className="font-bold text-sm text-[#1a1a1a]">Agent Controls</h3>
+                      <div className="space-y-3">
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span>Enable Storefront chat</span>
+                          <input type="checkbox" defaultChecked className="w-4 h-4 text-[#8f61f7] border-gray-300 rounded focus:ring-[#8f61f7]" />
+                        </label>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span>Autonomously build drafts</span>
+                          <input type="checkbox" defaultChecked className="w-4 h-4 text-[#8f61f7] border-gray-300 rounded focus:ring-[#8f61f7]" />
+                        </label>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span>Auto-suggest alternatives</span>
+                          <input type="checkbox" defaultChecked className="w-4 h-4 text-[#8f61f7] border-gray-300 rounded focus:ring-[#8f61f7]" />
+                        </label>
+                      </div>
+                      <div className="pt-2 border-t text-[10px] text-gray-500">
+                        Agent is connected to GPT-4o Mini model and syncs with product catalog inventory real-time.
+                      </div>
                     </div>
                   </div>
                 </div>

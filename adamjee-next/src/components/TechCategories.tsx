@@ -1,3 +1,4 @@
+'use client';
 import React from "react";
 import { ArrowRight, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 

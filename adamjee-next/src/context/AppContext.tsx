@@ -46,11 +46,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .catch(err => console.error('Failed to sync products from API:', err));
   }, []);
 
-  // Save cart to localStorage
+  // Save cart to localStorage (always sync, including empty cart)
   useEffect(() => {
-    if (cart.length > 0) {
-      localStorage.setItem('cart', JSON.stringify(cart));
-    }
+    localStorage.setItem('cart', JSON.stringify(cart));
   }, [cart]);
 
   const currency = CURRENCIES[currencyCode];

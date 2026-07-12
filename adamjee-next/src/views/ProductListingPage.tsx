@@ -523,9 +523,20 @@ function Stars({ rating }: { rating: number }) {
 export default function ProductListingPage({ handleAddToCart, formatPrice }: ProductListingPageProps) {
   const { id } = useParams() as { id: string };
   const [productsList, setProductsList] = useState<Product[]>(() => INITIAL_PRODUCTS);
-  useEffect(() => { setProductsList(getProducts()); }, []);
+  useEffect(() => {
+    setProductsList(getProducts());
+    fetch('/api/products?limit=100')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.products) {
+          setProductsList(data.products);
+          localStorage.setItem('adamjee_products', JSON.stringify(data.products));
+        }
+      })
+      .catch(console.error);
+  }, []);
 
-  const product = productsList.find(p => p.id === id) || productsList[0];
+  const product = productsList.find(p => p.id === id || p._id === id || p.slug === id) || productsList[0];
   const images = [product.image, ...(product.additionalImages || [])];
 
   /* Related: same category first, then others */

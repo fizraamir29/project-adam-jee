@@ -1,3 +1,4 @@
+'use client';
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Send, Facebook, Instagram, Youtube } from 'lucide-react';
 import { useSEO } from '../hooks/useSEO';

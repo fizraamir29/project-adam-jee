@@ -1,3 +1,4 @@
+'use client';
 import React, { useState } from "react";
 import { useSEO } from "../hooks/useSEO";
 import { Product } from "../types";

@@ -1,3 +1,4 @@
+'use client';
 import React from "react";
 import { Star, ArrowRight, Eye } from "lucide-react";
 import { Product } from "../types";
@@ -9,7 +10,26 @@ interface NewArrivalsProps {
 }
 
 export default function NewArrivals({ onAddToCart, formatPrice }: NewArrivalsProps) {
-  const products = NEW_ARRIVALS.slice(0, 6);
+  const [products, setProducts] = React.useState<Product[]>(() => NEW_ARRIVALS.slice(0, 6));
+
+  React.useEffect(() => {
+    fetch('/api/products?limit=6&sort=newest')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.products) {
+          const fetched = data.products;
+          if (fetched.length < 6) {
+            const fallback = NEW_ARRIVALS.filter(na => !fetched.some((f: any) => f._id === na.id || f.id === na.id || f.id === na._id || f._id === na._id));
+            setProducts([...fetched, ...fallback].slice(0, 6));
+          } else {
+            setProducts(fetched);
+          }
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load new arrivals:', err);
+      });
+  }, []);
 
   return (
     <section id="featured-arrivals" className="px-4 md:px-12 py-12 bg-gray-50/50">

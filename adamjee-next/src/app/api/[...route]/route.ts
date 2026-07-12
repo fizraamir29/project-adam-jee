@@ -154,6 +154,7 @@ INSTRUCTIONS:
 export async function GET(req: Request, { params }: { params: Promise<{ route: string[] }> }) {
   await connectDB();
   const { route } = await params;
+  console.log("=== GET route params ===", route);
   const pathStr = route.join('/');
   const searchParams = new URL(req.url).searchParams;
 
@@ -238,7 +239,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ route: s
     if (route[0] === 'products' && route.length === 2) {
       const identifier = route[1];
       if (mongoose.connection.readyState !== 1) {
-        const product = mockProductsMemory.find(p => p._id === identifier || p.slug === identifier);
+        const product = mockProductsMemory.find(p => p._id === identifier || p.slug === identifier || p.id === identifier);
         if (!product) return NextResponse.json({ success: false, message: 'Product not found' }, { status: 404 });
         return NextResponse.json({ success: true, product });
       }
@@ -1185,6 +1186,70 @@ export async function POST(req: Request, { params }: { params: Promise<{ route: 
           message: "AdminBot encountered an error. Please try again.",
           sessionId
         });
+      }
+    }
+
+    // Admin AI Generate description: POST /api/admin/ai-generate
+    if (pathStr === 'admin/ai-generate') {
+      const user = await getAuthenticatedUser(req);
+      if (!isAdmin(user)) {
+        return NextResponse.json({ success: false, message: 'Access denied. Admins only.' }, { status: 403 });
+      }
+
+      const { prompt } = body;
+      if (!prompt?.trim()) {
+        return NextResponse.json({ success: false, message: 'Prompt is required' }, { status: 400 });
+      }
+
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        const mockResponse = `This is a high-performance, premium product designed for enthusiasts. It offers outstanding reliability, advanced specifications, and sleek aesthetics. Based on your prompt "${prompt}", it is perfect for gaming or heavy work tasks.`;
+        return NextResponse.json({ success: true, text: mockResponse });
+      }
+
+      const isOpenRouter = apiKey.startsWith('sk-or-');
+      const modelToUse = isOpenRouter ? 'openrouter/free' : 'gpt-4o-mini';
+
+      try {
+        const compResponse = await fetch(
+          isOpenRouter
+            ? 'https://openrouter.ai/api/v1/chat/completions'
+            : 'https://api.openai.com/v1/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+              ...(isOpenRouter && {
+                'HTTP-Referer': 'https://adamjeecomputers.com',
+                'X-Title': 'Adamjee Admin',
+              }),
+            },
+            body: JSON.stringify({
+              model: modelToUse,
+              messages: [
+                {
+                  role: 'system',
+                  content: "You are a professional copywriter for Adamjee Computers. Generate a compelling, detailed, and professional e-commerce product description in English based on the user's prompt. Keep it around 3-4 sentences, highlighting key benefits and specs.",
+                },
+                { role: 'user', content: prompt },
+              ],
+              max_tokens: 300,
+              temperature: 0.7,
+            }),
+          }
+        );
+
+        const compData = await compResponse.json();
+        const generatedText = compData.choices?.[0]?.message?.content ||
+          "Failed to generate product description. Please try again.";
+
+        return NextResponse.json({ success: true, text: generatedText });
+      } catch (err: any) {
+        return NextResponse.json({
+          success: false,
+          message: err.message || "AI generation failed. Please try again."
+        }, { status: 500 });
       }
     }
 
